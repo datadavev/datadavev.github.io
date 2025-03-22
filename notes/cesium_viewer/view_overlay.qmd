@@ -1,0 +1,155 @@
+---
+title: "Cesium View Overlay"
+author: Dave Vieglais
+date: 2025-03-11
+abstract: An overlay for showing html content.
+tags: [spatial, visualize, data]
+categories: [data, recipe]
+execute:
+  echo: false
+---
+
+This example demonstrates an approach for adding an HTML overlay on the Cesium widget. In this case, the latitude and longitude of the mouse cursor and the elevation of the camera relative to the ellipsoid is shown in a html table in the top left of the widget.
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet"></link>
+<style>
+    div.cesium-topleft {
+        display: block;
+        position: absolute;
+        background: #00000055;
+        color: white;
+        height: auto;
+        z-index: 999;        
+    }
+</style>
+
+<div id="cesiumContainer"></div>
+
+```{ojs}
+//| output: false
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzk3NjkyMy1iNGI1LTRkN2UtODRiMy04OTYwYWE0N2M3ZTkiLCJpZCI6Njk1MTcsImlhdCI6MTYzMzU0MTQ3N30.e70dpNzOCDRLDGxRguQCC-tRzGzA-23Xgno5lNgCeB4';
+```
+
+
+```{ojs}
+/**
+ * From: https://sandcastle.cesium.com/?src=Custom%20Geocoder.html
+ * 
+ * This class is an example of a custom geocoder. It provides geocoding through the OpenStreetMap Nominatim service.
+ * @alias OpenStreetMapNominatimGeocoder
+ * @constructor
+ */
+class OpenStreetMapNominatimGeocoder{
+
+    /**
+     * The function called to geocode using this geocoder service.
+     *
+     * @param {string} input The query to be sent to the geocoder service
+     * @returns {Promise<GeocoderService.Result[]>}
+     */
+    geocode(input) {
+        const endpoint = "https://nominatim.openstreetmap.org/search";
+        const resource = new Cesium.Resource({
+            url: endpoint,
+            queryParameters: {
+            format: "json",
+            q: input,
+            },
+        });
+
+        return resource.fetchJson().then(function (results) {
+            let bboxDegrees;
+            return results.map(function (resultObject) {
+            bboxDegrees = resultObject.boundingbox;
+            return {
+                displayName: resultObject.display_name,
+                destination: Cesium.Rectangle.fromDegrees(
+                bboxDegrees[2],
+                bboxDegrees[0],
+                bboxDegrees[3],
+                bboxDegrees[1],
+                ),
+            };
+            });
+        });
+    };
+}
+
+/**
+ * Get the cesium-widget div created under the container div.
+ */
+function getCesiumWidget(ele) {
+    const container = document.getElementById(ele);
+    return container.querySelector(".cesium-widget");
+}
+
+/**
+ * Create a semi-transparent div that sits on top of the vesium-widget
+ */
+function createOverlayElement(ele, width="140px") {
+    const overlay = document.createElement("div")
+    overlay.setAttribute("class", "cesium-topleft");
+    overlay.style.width = width;
+    const container = getCesiumWidget(ele)
+    container.insertBefore(overlay, container.firstChild);
+    return overlay;
+}
+
+
+class CView {
+    constructor(target) {
+        this.viewer = new Cesium.Viewer(
+        target, {
+            timeline: false,
+            animation: false,
+            baseLayerPicker: false,
+            geocoder: new OpenStreetMapNominatimGeocoder(),
+            fullscreenElement: target,
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+        });
+        this.overlay = createOverlayElement(target); 
+        this.mouseMoveHandler = null;
+    }
+
+    async handleMouseMove(event) {
+        const ray = this.viewer.camera.getPickRay(event.position);
+        const mousePosition = this.viewer.scene.globe.pick(ray, this.viewer.scene);
+        if (Cesium.defined(mousePosition)) {
+            var cartographic = Cesium.Cartographic.fromCartesian(mousePosition);
+            var cheight = cartographic.height;
+            var gheight = this.viewer.scene.globe.getHeight(cartographic);
+            this.showLocation(cartographic.longitude, cartographic.latitude, cheight, gheight);
+        }
+    }
+    
+    setMouseMoveHandler() {
+        this.mouseMoveHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+        // hold a reference to this for use in the created function
+        const self = this;
+        this.mouseMoveHandler.setInputAction(async function(event) {
+            const ray = self.viewer.camera.getPickRay(event.endPosition);
+            const mousePosition = self.viewer.scene.globe.pick(ray, self.viewer.scene);
+            if (Cesium.defined(mousePosition)) {
+                const cartographic = Cesium.Cartographic.fromCartesian(mousePosition);
+                const cameraPosition = self.viewer.scene.camera.positionWC;
+                const ellipsoidPosition = self.viewer.scene.globe.ellipsoid.scaleToGeodeticSurface(cameraPosition);
+                const distance = Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(cameraPosition, ellipsoidPosition, new Cesium.Cartesian3()));
+                self.overlay.innerHTML = `<table>
+<tr><td>Latitude</td><td>${Cesium.Math.toDegrees(cartographic.latitude).toFixed(3)}</tr>
+<tr><td>Longitude</td><td>${Cesium.Math.toDegrees(cartographic.longitude).toFixed(3)}</td></tr>
+<tr><td>Camera d(km)</td><td>${(distance/1000).toFixed(1)}</td></tr>
+</table>`; 
+            } else {
+                self.overlay.innerHTML = "";
+            }
+        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    }
+}
+
+content = new CView("cesiumContainer");
+_ = content.setMouseMoveHandler();
+```
+
+
+

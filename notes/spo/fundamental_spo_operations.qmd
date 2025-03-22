@@ -1,0 +1,24 @@
+---
+title: Fundamental SPO Operations
+subtitle: Fundamental operations on RDF statements.
+categories: [graph, rdf]
+---
+
+Exploring some core operations on subject, predicate, and object combinations, i.e. RDF statements[^1].
+
+Given a subject and predicate, what is the object?
+
+Given a predicate and object, what is the subject?
+
+Given a subject and object, what are the predicates?
+
+Given a subject, what are the predicates?
+
+Given a subject, what are the objects related by any predicate?
+
+Given an object, what are the known predicates?
+
+Given an object, what are the known subjects?
+
+^1: https://www.w3.org/TR/rdf11-concepts/#resources-and-statements
+

@@ -1,0 +1,36 @@
+---
+title: "Conspiracy"
+author: Dave Vieglais
+date: 2022-01-10
+abstract: Some notes on conspiracy and its formation.
+jupyter: python3
+tags: [conspiracy, belief, behavior]
+categories: [behavior, society]
+---
+
+Participants who were more likely to detect order in this \[computer generated random sequence of coin tosses\] sequence were also more prone to endorse belief in conspiracies @friedmanWhyHumansAre2020.
+
+> It should not surprise us that so many of our patients are vulnerable to medical misinformation and to "fake news" in general. Because of social media and the Internet, we are practically drowning in information. For a species so intent on connecting the dots and making sense of the world, this information-rich environment is fertile ground for confusion and conspiracy theories. People do not instinctively fact-check what they read or listen to---doing so requires far too much cognitive work and runs counter to how the brain has evolved. (@friedmanWhyHumansAre2020)
+
+Research shows that higher levels of education are inversely correlated with belief in conspiracies, presumably because education fosters critical thinking and skepticism, which makes it easier to suppress one's often misleading intuition (@prooijenWhyEducationPredicts2017).
+
+Conspiracy theories are a human reaction to confusing times. "We're all just trying to understand the world and what's happening in it," says Rob Brotherton, a psychologist at Barnard College and author of Suspicious Minds: Why We Believe in Conspiracy Theories (@brothertonSuspiciousMindsWhy2015).
+
+`conspiracy theory` noun. "a theory that explains an event or set of circumstances as the result of a secret plot by usually powerful conspirators"
+
+Conspiracy is the creation of belief or understanding from the incorrect interpretation of apparent patterns and associations to have factual basis.
+
+People are unable to fact check large volumes of information, and instead tend to rely on pattern detection to form understanding.
+
+Conspiracies gain traction through communication between like minded participants. Tribal behavior. Internet fora facilitate tribe formation.
+
+**An environment with overwhelming information leads to greater propensity for conspiracy theories to emerge.**
+
+1.  Conspiracy theories contain contradictions.
+2.  Contention is based on shaky assumptions.
+3.  Interpreting evidence against as evidence for it.
+
+- @heathFREEMARKETIDEOLOGYENVIRONMENTAL2006
+- @lewandowskyNASAFakedMoon2013
+
+Suppression of education fosters a population more readily manipulated through belief in conspiracies. Information overload can further promote conpiratory belief.

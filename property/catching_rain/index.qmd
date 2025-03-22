@@ -1,0 +1,137 @@
+---
+title: Catching Rain
+author: Dave Vieglais
+subtitle: How much roof area do I need to supply my house?
+categories: [living, rainwater]
+reference-location: margin
+jupyter: python3
+format:
+  html:
+    code-fold: true
+---
+
+Collecting rainwater and storing it in a cistern for household use is not a novel concept. How much roof area and storage is needed? How should it be treated prior to consumption?
+
+Rainwater was considered to be a generally clean source of water requiring minimal treatment for safe consumption (@thomasRainwaterHarvestingUnited2014). A recent study (@cousinsOutsideSafeOperating2022) reveals that PFAS contamination is now global, and untreated rainwater is no longer safe to drink anywhere on the earth. It is thus necessary to filter rainwater with a recommended process (@usepaReducingPFASDrinking2018) for consumption. [But what about the impacts of PFAS on the natural environment, with no luxury of filtration before consumption?]{.aside}
+
+The average annual precipitation in Anne Arundel county is 42.45 inches, with an average of 4.17±0.25 per month with a 95% CI [^1]. Note that there is a lot of variability. May of 2015 was about 1.5 inches, June 2015 was over 12.5 inches of rain.
+
+[^1]: [NOAA NCDC, Anne Arundel County](https://www.ncdc.noaa.gov/cag/county/time-series/MD-003/pcp/ann/3/1895-2022?base_prd=true&begbaseyear=1901&endbaseyear=2000&trend=true&trend_base=10&begtrendyear=1895&endtrendyear=2022)
+
+```{python}
+import os
+import json
+import itables
+import pandas as pd
+import plotly.io as pio
+import plotly.express as px
+
+pio.renderers.default = "notebook"
+
+data = []
+dpath = "data/"
+for m in range(1,13):
+    with open(os.path.join(dpath, f"precip_{m}.json"), "r") as inf:
+        mdata = json.load(inf)
+        for k in mdata["data"].keys():
+            year = int(k[:4])
+            if year < 2021:
+                month = m
+                v = float(mdata["data"][k]["value"])
+                row = [year, month, v]
+                data.append(row)
+df = pd.DataFrame(data, columns=["Year", "Month", "Precip"])
+aaco_precip = px.scatter(
+    df.query("Year < 2021").groupby(["Year"]).sum().reset_index(), 
+    x="Year", 
+    y="Precip",
+    trendline="ols",
+    labels={
+        "Year":"Year",
+        "Precip":"Precip. (in)"
+    },
+    height=400
+)
+aaco_precip.show()
+stats = px.get_trendline_results(aaco_precip)
+monthly_means = df.query("Year < 2021").groupby("Month").mean().reset_index()
+monthly_std = df.query("Year < 2021").groupby("Month").std().reset_index()
+monthly_precip = px.bar(
+    monthly_means,
+    x = "Month",
+    y = "Precip",
+    labels={
+        "Month":"Month",
+        "Precip":"Precip. (in)"
+    },
+    height=300,
+    error_y=monthly_std["Precip"],
+)
+monthly_precip.update_traces(marker_color='rgb(158,202,225)', marker_line_color='rgb(8,48,107)',
+                  marker_line_width=1.5, opacity=0.6)
+monthly_precip.show()
+```
+
+The calculations are straight forward:
+
+One inch is $\frac{1}{12} ft$, so one inch of rain on one square foot of surface is:
+
+$$
+\frac{1}{12}ft \times 1ft \times 1ft = 0.08333ft^3
+$$
+
+Given $1 gal = 231in^3$ and $1ft^3 = 1728in^3$, so $1ft^3 = 7.48049\:gal$ [^2]:
+
+[^2]: [NIST Handbook 133](https://www.nist.gov/pml/weights-and-measures/publications/nist-handbooks/handbook-133-current-edition). [Appendix E. General Tables of Units of Measurement](https://www.nist.gov/system/files/documents/2017/04/28/12-apde-gentab-11-hb133-final.pdf)
+
+$$
+1in = 0.08333 \times 7.48049 = 0.62337\:gal
+$$
+
+So one inch of rain on one square foot of surface yields 0.62337 gallons.
+
+A household will use about [125 gallons per day](https://en.wikipedia.org/wiki/Residential_water_use_in_the_U.S._and_Canada>)
+with no deliberate conservation[^3]. That equates to about 45,625 gallons per year. Assuming an average of 42.5" rain for the year in this part of Maryland, a catchment area of about 1800 sqft will be sufficient, more or less. Variability in input (rainfall) and output (use) is quite high, so storage buffering is necessary to get through the high use, low rainfall periods.
+
+[^3]: The range is is large, up to about 650 g/day, with median of about 125.
+
+
+```{python}
+#| output: asis
+
+from IPython.display import Markdown
+
+def gallons(area_feet, amount_inches):
+    return amount_inches * area_feet * 0.62337
+
+areas = [1,10,100,200,400,800,1200,1800]
+rainfall = [0.25, 1,2,4.2,8,10,42.5]
+
+table = []
+table.append('<table class="table table-sm table-striped">')
+table.append('<thead>')
+table.append(f'<tr><th style="border-bottom: none;"></th><th colspan="{len(rainfall)}" style="text-align:center;">Rainfall</th></tr>')
+h = [f'<th style="text-align:right;">{v}&quot;</th>' for v in rainfall]
+table.append(f'<tr><th>Area ft<sup>2</sup>{"".join(h)}</tr>')
+table.append('</thead>')
+table.append('<tbody>')
+data = []
+header = ["Area $ft^2$",] + [f'{v}"' for v in rainfall]
+for area in areas:
+    row = [f'<td style="text-align:right;">{area}</td>',]
+    for amount in rainfall:
+        row.append(f'<td style="text-align:right;">{gallons(area, amount):5.1f}</td>')
+    table.append(f"<tr>{''.join(row)}</tr>")
+
+table.append('</tbody>')
+table.append('</table>')
+Markdown("\n".join(table))
+```
+
+Notes:
+
+* Rainwater characteristics @keresztesiSpatialLongtermAnalysis2020
+* Rainwater in West Kalimantan @khayanRainwaterSourceDrinking2019
+* Rainwater treatment @kimHarvestedRainwaterQuality2016
+* Rainwater harvesting regulations, @RainwaterHarvestingRegulations
+* Rainwater harveting in American Samoa, @kirsRainwaterHarvestingAmerican2017

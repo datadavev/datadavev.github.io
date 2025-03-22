@@ -1,0 +1,108 @@
+[
+    {
+        "id":"a",
+        "name_t":"parent a"
+    },
+    {
+        "id":"b",
+        "name_t":"parent b"
+    },
+    {
+        "id":"aa",
+        "name_t":"sub aa",
+        "related":[
+            {
+                "id":"111",
+                "relation_type_s":"subsample-of",
+                "target_s":"a"
+            }
+        ]
+    },
+    {
+        "id":"ab",
+        "name_t":"sub ab",
+        "related":[
+            {
+                "id":"112",
+                "relation_type_s":"subsample-of",
+                "target_s":"a"
+            }
+        ]
+    },
+    {
+        "id":"aaa",
+        "name_t":"sub aaa",
+        "related":[
+            {
+                "id":"113",
+                "relation_type_s":"analysis-of",
+                "target_s":"aa"
+            },
+            {
+                "id":"114",
+                "relation_type_s":"subsample-of",
+                "target_s":"aa"
+            }
+        ]
+    },
+    {
+        "id":"aab",
+        "name_t":"sub aab",
+        "related":[
+            {
+                "id":"120",
+                "relation_type_s":"subsample-of",
+                "target_s":"ab"
+            }
+        ]
+    },
+    {
+        "id":"ba",
+        "name_t":"sub ba",
+        "related":[
+            {
+                "id":"114",
+                "relation_type_s":"subsample-of",
+                "target_s":"b"
+            }
+        ]
+    },
+    {
+        "id":"baa",
+        "name_t":"sub baa",
+        "related":[
+            {
+                "id":"115",
+                "relation_type_s":"analysis-of",
+                "target_s":"ba"
+            }
+        ]
+    },
+    {
+        "id":"bb",
+        "name_t":"sub bb",
+        "related":[
+            {
+                "id":"121",
+                "relation_type_s":"subsample-of",
+                "target_s":"b"
+            }
+        ]
+    },
+    {
+        "id":"ccc",
+        "name_t": "publication",
+        "related":[
+            {
+                "id":"ccc1",
+                "relation_type_s":"references",
+                "target_s":"aaa"
+            },
+            {
+                "id":"ccc2",
+                "relation_type_s":"references",
+                "target_s":"baa"
+            }
+        ]   
+    }
+]

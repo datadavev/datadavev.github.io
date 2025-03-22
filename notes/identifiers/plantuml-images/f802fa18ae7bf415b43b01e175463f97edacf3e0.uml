@@ -1,0 +1,33 @@
+@startuml
+'| fig-cap: |
+'|   Generalization of identifier resolution through three levels of resolver service. The *Scheme Resolver* 
+'|   understands "ark:" identifiers are resolved by the *Prefix Resolver* `n2t.net`, which in turn understands 
+'|   identifiers with the prefix "12148" are resolved by the *Resource Resolver* `ark.bnf.fr`. The 
+'|   *Resource Resolver* in turn directs the user to the actual resource.
+
+@startuml
+Actor User as user
+Participant "Scheme\nResolver" as sr
+Participant "Prefix\nResolver" as pr
+Participant "Resource\nResolver" as rr
+Participant "Resource\nServer" as rs
+user -> sr: **ark:**/12148/bpt6k10733944
+activate user
+activate sr
+sr --> user: 302 "https://n2t.net/ark:/12148/bpt6k10733944"
+deactivate sr
+user -> pr: **ark:/12148**/bpt6k10733944
+activate pr
+pr --> user: 302 "https://ark.bnf.fr/ark:/12148/bpt6k10733944"
+deactivate pr
+user -> rr: ark.bnf.fr/**ark:/12148/bpt6k10733944**
+activate rr
+rr --> user: 302 "https://gallica.bnf.fr/ark:/12148/bpt6k10733944"
+deactivate rr
+user -> rs: gallica.bnf.fr/**ark:/12148/bpt6k10733944**
+activate rs
+rs --> user: 200 "Aventures d'Alice au pays des merveilles / par Lewis Carroll ; illustrées par Arthur Rackham"
+deactivate rs
+deactivate user
+@enduml
+@enduml

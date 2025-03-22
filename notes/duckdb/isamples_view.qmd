@@ -1,0 +1,55 @@
+---
+title: "View iSamples Parquet"
+---
+
+```{ojs}
+// Import Observable's libraries
+import {DuckDBClient} from "@observablehq/duckdb"
+
+// Create a DuckDB instance
+db = DuckDBClient.of()
+
+// Set the Parquet file path
+parquet_path = 'https://storage.googleapis.com/opencontext-parquet/oc_isamples_pqg.parquet'
+
+
+async function loadData(query, params=[], waiting_id=null) {
+    // Get loading indicator
+    const waiter = document.getElementById(waiting_id);
+    if (waiter) {
+        waiter.hidden = false;
+    }
+    try {
+        // Run the (slow) query
+        const _results = await db.query(query, ...params);
+        return _results;
+    } catch (error) {
+        if (waiter) {
+            waiter.innerHtml = `<pre>${error}</pre>`;
+        }
+        return null;
+    } finally {
+        // Hide the waiter (if there is one)
+        if (waiter) {
+            waiter.hidden = true;
+        }
+    }
+}
+
+{
+    const query = `SELECT pid, latitude, longitude FROM read_parquet('${parquet_path}') WHERE otype='GeospatialCoordLocation'`;
+    return Inputs.table(loadData(query, [], "loading_1"));
+}
+```
+
+<div id="loading_1">Loading...</div>
+
+
+
+```
+// Query the Parquet file
+records = loadData(`SELECT COUNT(*) as count, otype FROM read_parquet('${parquet_path}') GROUP BY otype ORDER BY count DESC`, [], "loading_2")
+viewof results = Inputs.table(records);
+```
+
+<div id="loading_2">Loading...</div>

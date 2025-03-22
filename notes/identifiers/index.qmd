@@ -1,0 +1,76 @@
+---
+title: Identifiers
+subtitle: Common identifier model
+categories: [data]
+---
+
+
+An identifier is a sequence of characters used to identify a resource. 
+
+A resolvable identifier is an identifier which, when provided to a resolving service, provides the location of the identified resource. There are many implementations of resolver services, most mated to particular types of identifier, or identifiers that conform to a particular scheme.
+
+Identifiers are generally composed of several components:
+
+$\color{navy}{\mathtt{Scheme}}:\color{salmon}{\mathtt{NAA}}/\color{red}{\mathtt{Prefix}}\color{darkorange}{\mathtt{Value}}\color{lightblue}{\mathtt{Extra}}$
+
+$\color{navy}{\mathtt{Scheme}}$ indicates the type of identifier, for example "doi", "ark", and "igsn".
+
+$\color{salmon}{\mathtt{NAA}}$ is an "Name Assigning Authority" which is a string (generally numeric characters) identifying the agent responsible for creating the identifier. Name assigning authorities are registered with the identifier infrastructure for the scheme.
+
+$\color{red}{\mathtt{Prefix}}$ is a set of characters at the start of the identifier value that can be used by a name assigning authority to group identifiers. This can be useful where parallel activities may be occurring (to avoid identifier collisions) or for grouping activities such as expeditions or experiments. Note that for legacy IGSNs, the prefixes are collaboratively managed to be unique across all name assigning authorities.
+
+$\color{darkorange}{\mathtt{Value}}$ is the part of the identifier that is specific to a single resource within the context of a scheme, name assigning authority, and prefix combination.
+
+$\color{lightblue}{\mathtt{Extra}}$ includes any characters beyond the minted identifier. These offer no value in resolving an identifier, but a resolver should pass these characters verbatim to the resource provider.
+
+**Namespace** = $\color{salmon}{\mathtt{NAA}}/\color{red}{\mathtt{Prefix}}$. 
+
+## DOI
+
+$\color{navy}{\mathtt{doi}}:\color{salmon}{\mathtt{10.1234}}/\color{red}{\mathtt{TT}}\color{darkorange}{\mathtt{fq98d}}\color{lightblue}{\mathtt{?k1=v1\&k2=v2}}$
+
+| Term | Scheme Equivalent | Notes |
+| - | - | - |
+| NAA | Prefix | Period delimited numeric, managed by central authority. |
+| Prefix | | |
+| Value | | |
+| Namespace | | |
+
+
+## ARK
+
+$\color{navy}{\mathtt{ark}}:\color{salmon}{\mathtt{1234}}/\color{red}{\mathtt{TT}}\color{darkorange}{\mathtt{fq98d}}\color{lightblue}{\mathtt{?k1=v1\&k2=v2}}$
+
+The NAA here is equivalent to the ARK NAAN (Name Assigning Authority Number). NAAN values are managed by a central authority.
+
+| Term | Scheme Equivalent | Notes |
+| - | - | - |
+| NAA | NAAN | Numeric, managed by central authority. |
+| Prefix | | |
+| Value | | |
+| Namespace | Shoulder | |
+
+## IGSN
+
+The IGSN scheme is currently (mid 2022) undergoing a transition. The existing (legacy) IGSN pattern is:
+
+$\color{navy}{\mathtt{igsn}}:\color{red}{\mathtt{TT}}\color{darkorange}{\mathtt{fq98d}}\color{lightblue}{\mathtt{?k1=v1\&k2=v2}}$
+
+| Term | Scheme Equivalent | Notes |
+| - | - | - |
+| NAA | Prefix | Constant = "10273". |
+| Prefix | Top-level Namespace | Managed by a central authority. |
+| Value | Code | [A-Z]+[0-9] + "-" + ".", not case sensitive. |
+| Namespace | | |
+
+The future IGSN pattern will be the same as DOIs:
+
+$\color{navy}{\mathtt{igsn}}:\color{salmon}{\mathtt{10.1234}}/\color{red}{\mathtt{TT}}\color{darkorange}{\mathtt{fq98d}}\color{lightblue}{\mathtt{?k1=v1\&k2=v2}}$
+
+| Term | Scheme Equivalent | Notes |
+| - | - | - |
+| NAA | Prefix | Period delimited numeric, managed by central authority. |
+| Prefix | | |
+| Value | | |
+| Namespace | | |
+

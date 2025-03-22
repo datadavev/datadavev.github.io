@@ -1,0 +1,382 @@
+---
+title: DOIs are Borken. Sort of.
+subtitle: Unpredictable results when resolving DOIs.
+categories: [data, identifiers]
+---
+
+The current DataCite DOI resolver services does not respect content negotiation for JSON-LD. Instead of returning the location of the requested resource, the location of DataCite specific content is returned. The consequence is that the DataCite DOI infrastructure will not reliably resolve JSON-LD resources.
+
+## The problem
+
+Implementation of [content negotiation](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3) by DOI resolver implementations can override the functionality of a resource provider creating unpredictable results for a resource consumer.
+
+For example, the DOI `10.1594/PANGAEA.930327` identifies a resource located at the URL `https://doi.pangaea.de/10.1594/PANGAEA.930327`. Requesting this resource over HTTP using an `Accept` header preferring `text/html` results in the HTML representation of the resource. When requesting the resource from that URL with a preference of `application/ld+json`, the resource provider returns a JSON-LD representation of the resource. This is the expected behavior.
+
+If however a resource consumer performs DOI resolution to determine the location of the resource then the behavior is different. The DOI resolver will instead present the location of the resolver implementation copy of metadata (e.g. DataCite metadata). This means DOIs can not be used to reliably reference some content types. The list of [content types overridden by DataCite](https://support.datacite.org/docs/datacite-content-resolver#supported-content-types) includes:
+
+| Format | Content Type |
+| -- | -- |
+|RDF XML | application/rdf+xml|
+|RDF Turtle | text/turtle |
+|Citeproc JSON | application/vnd.citationstyles.csl+json |
+|Schema.org in JSON-LD | application/ld+json |
+|Codemeta | application/vnd.codemeta.ld+json |
+|Formatted text citation | text/x-bibliography |
+|RIS | application/x-research-info-systems |
+|BibTeX | application/x-bibtex |
+|DataCite XML | application/vnd.datacite.datacite+xml |
+|DataCite JSON | application/vnd.datacite.datacite+json |
+|JATS | application/vnd.jats+xml |
+
+## Example
+
+The following example illustrates the issue for the case of JSON-LD (a common serialization of schema.org RDF).
+
+A request to resolve the HTML representation behaves as expected (`>` and `<` denote request and response respectively):
+
+```
+> https://doi.org/10.1594/PANGAEA.930327 
+> Accept: text/html
+< 302 
+< Location: https://doi.pangaea.de/10.1594/PANGAEA.930327
+
+> https://doi.pangaea.de/10.1594/PANGAEA.930327 
+> Accept: text/html
+< 200 
+< Content-Type: text/html
+```
+
+A request for the JSON-LD representation however results in a different resource than the copy returned by the resource authority. Request JSON-LD directly from the resource provider:
+
+```
+> https://doi.pangaea.de/10.1594/PANGAEA.930327 
+> Accept: application/ld+json
+< 200 
+< Content-Type: application/ld+json; charset=UTF-8
+```
+
+Request JSON-LD by way of DOI resolution:
+
+```
+> https://doi.org/10.1594/PANGAEA.930327 
+> Accept: application/ld+json
+< 302 
+< Location: https://data.crosscite.org/10.1594%2FPANGAEA.930327
+
+> https://data.crosscite.org/10.1594%2FPANGAEA.930327 
+> Accept: application/ld+json
+< 200 
+< Content-Type: application/ld+json
+```
+
+Note that the final URL returned by the resolver is different to the URL presented by the resource owner. 
+
+There are significant differences in the JSON-LD retrieved from the resource provider compared with the DOI service. See below. 
+
+Besides the impact on reliable retrieval of authoritative content representations, this behavior also blocks information such as accesses to the resource that may useful to the resource provider for metrics collation and so forth.
+
+
+## Suggested fix
+
+The DOI resolver service should respond with a resolver service metadata  content representation only when specifically requested. 
+
+[RFC 8288](https://datatracker.ietf.org/doc/html/rfc8288)[**Web Linking** defines a model for the relationships between resources on the Web ("links") and the type of those relationships ("link relation types").]{.aside} provides a mechanism for advertising the availablity of related resource, including alternate representations of a resource aligned with different profiles.
+
+The resolver can advertise an alternate representation of a resource by including such information in the HTTP response `Link` header. Similarly, a resource provider could also promote availability of the resolver metadata by presenting the location of such a representation in its response.
+
+**At a minimum such information should be included when a resolver returns an alternate representation of a resource not specifically presented by the resource authority.**
+
+Ideally, the DOI resolver should only respond with information about the location of the requested resource.
+
+For example the DOI resolver could respond similarly to the following example, with the redirect response including a link to the location of the resolver metadata:
+
+```
+> https://doi.org/10.1594/PANGAEA.930327 Accept:application/ld+json
+< Link: <https://data.crosscite.org/10.1594%2FPANGAEA.930327>; rel="alternate"; type="application/ld+json"; profile="http://datacite.org/schema"
+< 302 https://doi.pangaea.de/10.1594/PANGAEA.930327
+
+> https://doi.pangaea.de/10.1594/PANGAEA.930327 Accept:application/ld+json
+< 200 application/ld+json
+```
+
+Note however that link header handling in redirect responses would only be available to programmatic clients. Intermediate communication details are not exposed to web browser based clients.
+
+## Comparison of retrieved documents
+
+### Resource provider copy
+
+Retrieved from the resource provider using:
+
+```
+curl -H "Accept: application/ld+json" \
+"https://doi.pangaea.de/10.1594/PANGAEA.930327"
+```
+
+```jsonld
+{
+  "@context": "http://schema.org/",
+  "@id": "https://doi.org/10.1594/PANGAEA.930327",
+  "@type": "Dataset",
+  "identifier": "https://doi.org/10.1594/PANGAEA.930327",
+  "url": "https://doi.pangaea.de/10.1594/PANGAEA.930327",
+  "creator": [
+    {
+      "@id": "https://orcid.org/0000-0003-0434-441X",
+      "@type": "Person",
+      "name": "Qing-Zeng Zhu",
+      "familyName": "Zhu",
+      "givenName": "Qing-Zeng",
+      "identifier": "https://orcid.org/0000-0003-0434-441X",
+      "email": "qzzhu@marum.de"
+    },
+    {
+      "@id": "https://orcid.org/0000-0003-3863-0975",
+      "@type": "Person",
+      "name": "Marcus Elvert",
+      "familyName": "Elvert",
+      "givenName": "Marcus",
+      "identifier": "https://orcid.org/0000-0003-3863-0975",
+      "email": "melvert@marum.de"
+    },
+    {
+      "@id": "https://orcid.org/0000-0001-8255-5883",
+      "@type": "Person",
+      "name": "Travis B Meador",
+      "familyName": "Meador",
+      "givenName": "Travis B",
+      "identifier": "https://orcid.org/0000-0001-8255-5883",
+      "email": "travis.meador@bc.cas.cz"
+    },
+    {
+      "@id": "https://orcid.org/0000-0001-6317-1884",
+      "@type": "Person",
+      "name": "Kevin W Becker",
+      "familyName": "Becker",
+      "givenName": "Kevin W",
+      "identifier": "https://orcid.org/0000-0001-6317-1884",
+      "email": "kbecker@geomar.de"
+    },
+    {
+      "@id": "https://orcid.org/0000-0002-1856-116X",
+      "@type": "Person",
+      "name": "Verena B Heuer",
+      "familyName": "Heuer",
+      "givenName": "Verena B",
+      "identifier": "https://orcid.org/0000-0002-1856-116X",
+      "email": "vheuer@marum.de"
+    },
+    {
+      "@id": "https://orcid.org/0000-0002-0739-9291",
+      "@type": "Person",
+      "name": "Kai-Uwe Hinrichs",
+      "familyName": "Hinrichs",
+      "givenName": "Kai-Uwe",
+      "identifier": "https://orcid.org/0000-0002-0739-9291",
+      "email": "khinrichs@uni-bremen.de"
+    }
+  ],
+  "name": "Archaeal lipid concentration and isotopic data in sediments from expeditions M84/1 and POS450",
+  "publisher": {
+    "@type": "Organization",
+    "name": "PANGAEA",
+    "disambiguatingDescription": "Data Publisher for Earth & Environmental Science",
+    "url": "https://www.pangaea.de/"
+  },
+  "includedInDataCatalog": {
+    "@type": "DataCatalog",
+    "name": "PANGAEA",
+    "disambiguatingDescription": "Data Publisher for Earth & Environmental Science",
+    "url": "https://www.pangaea.de/"
+  },
+  "datePublished": "2021-04-14",
+  "description": "Archaea occupy an important niche in the global carbon cycle and their lipids are widely used as indicators of environmental conditions in both paleoenvironmental and modern biogeochemical studies. The principal sources of archaeal lipids in marine sediments are benthic archaea, fossil remnants of planktonic archaea, and allochthonous sources such as soils. However, the relative contributions of these sources to the sedimentary lipid pool have not been comprehensively constrained, complicating a mechanistic understanding of archaeal lipid proxies. In order to provide insights into the relative contributions of these sources and identify signals derived from the sedimentary activity, we performed a systematic survey of concentrations and stable carbon isotopic compositions of both core and intact archaeal lipids  The sample set consisted of 44 sediment horizons from the Mediterranean and adjacent basins and represented diverse sources of organic matter and depositional conditions.",
+  "abstract": "Archaea occupy an important niche in the global carbon cycle and their lipids are widely used as indicators of environmental conditions in both paleoenvironmental and modern biogeochemical studies. The principal sources of archaeal lipids in marine sediments are benthic archaea, fossil remnants of planktonic archaea, and allochthonous sources such as soils. However, the relative contributions of these sources to the sedimentary lipid pool have not been comprehensively constrained, complicating a mechanistic understanding of archaeal lipid proxies. In order to provide insights into the relative contributions of these sources and identify signals derived from the sedimentary activity, we performed a systematic survey of concentrations and stable carbon isotopic compositions of both core and intact archaeal lipids  The sample set consisted of 44 sediment horizons from the Mediterranean and adjacent basins and represented diverse sources of organic matter and depositional conditions.",
+  "@reverse": {
+    "isBasedOn": {
+      "@id": "https://doi.org/10.1016/j.gca.2021.04.037",
+      "@type": "CreativeWork",
+      "identifier": "https://doi.org/10.1016/j.gca.2021.04.037",
+      "url": "https://doi.org/10.1016/j.gca.2021.04.037",
+      "creator": [
+        {
+          "@id": "https://orcid.org/0000-0003-0434-441X",
+          "@type": "Person",
+          "name": "Qing-Zeng Zhu",
+          "familyName": "Zhu",
+          "givenName": "Qing-Zeng",
+          "identifier": "https://orcid.org/0000-0003-0434-441X",
+          "email": "qzzhu@marum.de"
+        },
+        {
+          "@id": "https://orcid.org/0000-0003-3863-0975",
+          "@type": "Person",
+          "name": "Marcus Elvert",
+          "familyName": "Elvert",
+          "givenName": "Marcus",
+          "identifier": "https://orcid.org/0000-0003-3863-0975",
+          "email": "melvert@marum.de"
+        },
+        {
+          "@id": "https://orcid.org/0000-0001-8255-5883",
+          "@type": "Person",
+          "name": "Travis B Meador",
+          "familyName": "Meador",
+          "givenName": "Travis B",
+          "identifier": "https://orcid.org/0000-0001-8255-5883",
+          "email": "travis.meador@bc.cas.cz"
+        },
+        {
+          "@id": "https://orcid.org/0000-0001-6317-1884",
+          "@type": "Person",
+          "name": "Kevin W Becker",
+          "familyName": "Becker",
+          "givenName": "Kevin W",
+          "identifier": "https://orcid.org/0000-0001-6317-1884",
+          "email": "kbecker@geomar.de"
+        },
+        {
+          "@id": "https://orcid.org/0000-0002-1856-116X",
+          "@type": "Person",
+          "name": "Verena B Heuer",
+          "familyName": "Heuer",
+          "givenName": "Verena B",
+          "identifier": "https://orcid.org/0000-0002-1856-116X",
+          "email": "vheuer@marum.de"
+        },
+        {
+          "@id": "https://orcid.org/0000-0002-0739-9291",
+          "@type": "Person",
+          "name": "Kai-Uwe Hinrichs",
+          "familyName": "Hinrichs",
+          "givenName": "Kai-Uwe",
+          "identifier": "https://orcid.org/0000-0002-0739-9291",
+          "email": "khinrichs@uni-bremen.de"
+        }
+      ],
+      "name": "Stable carbon isotopic compositions of archaeal lipids constrain terrestrial, planktonic, and benthic sources in marine sediments",
+      "datePublished": "2021"
+    }
+  },
+  "funder": {
+    "@id": "https://doi.org/10.13039/100011102",
+    "@type": "Organization",
+    "identifier": "https://doi.org/10.13039/100011102",
+    "name": "Seventh Framework Programme"
+  },
+  "spatialCoverage": {
+    "@type": "Place",
+    "geo": {
+      "@type": "GeoShape",
+      "box": "33.027 3.48333 43.31617 32.633"
+    }
+  },
+  "temporalCoverage": "2011-02-14T12:50:00/2013-04-07T12:06:00",
+  "inLanguage": "en",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "conditionsOfAccess": "unrestricted",
+  "isAccessibleForFree": true,
+  "keywords": "Archaea; Butanetriol dibiphytanyl glycerol tetraethers; Geochemical zones; Glycerol dibiphytanyl glycerol tetraethers; in situ production; Intact polar lipids; marine sediments; stable carbon isotopes; Terrestrial input",
+  "size": {
+    "@type": "QuantitativeValue",
+    "value": 2,
+    "unitText": "datasets"
+  },
+  "distribution": {
+    "@type": "DataDownload",
+    "encodingFormat": "application/zip",
+    "contentUrl": "https://doi.pangaea.de/10.1594/PANGAEA.930327?format=zip"
+  }
+}
+```
+
+### DataCite copy
+
+Retrieved using:
+
+```
+curl -H "Accept: application/ld+json" \
+-L "https://doi.org/10.1594/PANGAEA.930327"
+```
+
+```jsonld
+{
+  "@context": "http://schema.org",
+  "@type": "Collection",
+  "@id": "https://doi.org/10.1594/pangaea.930327",
+  "url": "https://doi.pangaea.de/10.1594/PANGAEA.930327",
+  "additionalType": "Bundled Publication of Datasets",
+  "name": "Archaeal lipid concentration and isotopic data in sediments from expeditions M84/1 and POS450",
+  "author": [
+    {
+      "name": "Qing-Zeng Zhu",
+      "givenName": "Qing-Zeng",
+      "familyName": "Zhu",
+      "@id": "https://orcid.org/0000-0003-0434-441X"
+    },
+    {
+      "name": "Marcus Elvert",
+      "givenName": "Marcus",
+      "familyName": "Elvert",
+      "@id": "https://orcid.org/0000-0003-3863-0975"
+    },
+    {
+      "name": "Travis B Meador",
+      "givenName": "Travis B",
+      "familyName": "Meador",
+      "@id": "https://orcid.org/0000-0001-8255-5883"
+    },
+    {
+      "name": "Kevin W Becker",
+      "givenName": "Kevin W",
+      "familyName": "Becker",
+      "@id": "https://orcid.org/0000-0001-6317-1884"
+    },
+    {
+      "name": "Verena B Heuer",
+      "givenName": "Verena B",
+      "familyName": "Heuer",
+      "@id": "https://orcid.org/0000-0002-1856-116X"
+    },
+    {
+      "name": "Kai-Uwe Hinrichs",
+      "givenName": "Kai-Uwe",
+      "familyName": "Hinrichs",
+      "@id": "https://orcid.org/0000-0002-0739-9291"
+    }
+  ],
+  "description": "Archaea occupy an important niche in the global carbon cycle and their lipids are widely used as indicators of environmental conditions in both paleoenvironmental and modern biogeochemical studies. The principal sources of archaeal lipids in marine sediments are benthic archaea, fossil remnants of planktonic archaea, and allochthonous sources such as soils. However, the relative contributions of these sources to the sedimentary lipid pool have not been comprehensively constrained, complicating a mechanistic understanding of archaeal lipid proxies. In order to provide insights into the relative contributions of these sources and identify signals derived from the sedimentary activity, we performed a systematic survey of concentrations and stable carbon isotopic compositions of both core and intact archaeal lipids The sample set consisted of 44 sediment horizons from the Mediterranean and adjacent basins and represented diverse sources of organic matter and depositional conditions.",
+  "license": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "keywords": "Archaea, Butanetriol dibiphytanyl glycerol tetraethers, Geochemical zones, Glycerol dibiphytanyl glycerol tetraethers, in situ production, Intact polar lipids, marine sediments, stable carbon isotopes, Terrestrial input, Deep subsurface Archaea: carbon cycle, life strategies, and role in sedimentary ecosystems (DARCLIFE)",
+  "inLanguage": "en",
+  "contentSize": "2 datasets",
+  "encodingFormat": "application/zip",
+  "datePublished": "2021",
+  "spatialCoverage": {
+    "@type": "Place",
+    "geo": {
+      "@type": "GeoShape",
+      "box": "33.027 3.48333 43.31617 32.633"
+    }
+  },
+  "@reverse": {
+    "isBasedOn": {
+      "@id": "https://doi.org/10.1016/j.gca.2021.04.037",
+      "@type": "ScholarlyArticle"
+    }
+  },
+  "schemaVersion": "http://datacite.org/schema/kernel-4",
+  "publisher": {
+    "@type": "Organization",
+    "name": "PANGAEA"
+  },
+  "funder": {
+    "@id": "https://doi.org/10.13039/100011102",
+    "@type": "Organization",
+    "name": "Seventh Framework Programme"
+  },
+  "provider": {
+    "@type": "Organization",
+    "name": "datacite"
+  }
+}
+```

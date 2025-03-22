@@ -1,0 +1,212 @@
+---
+title: "Cesium View"
+author: Dave Vieglais
+date: 2025-03-11
+abstract: The CesiumJS viewer in Quarto pages.
+tags: [spatial, visualize, data]
+categories: [data, recipe]
+execute:
+  echo: false
+---
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet"></link>
+
+
+Placing the CesiumJS viewer in quarto pages, and adding some data.
+
+```{ojs}
+h3 = import("https://unpkg.com/h3-js@4.1.0/dist/h3-js.es.js");
+//Cesium = import("https://esm.run/cesium@1.127");
+```
+
+Examine a resolution 0 cell
+```{ojs}
+cells0 = h3.getRes0Cells();
+viewof m = Inputs.range([0, cells0.length-1], {label: "Cell number", step: 1});
+```
+
+There are ${cells0.length} cells at resolution 0. The coordinates of the edge points for cell ${m} in the list are:
+```{ojs}
+Inputs.table(h3.cellToBoundary(cells0[m], false), {columns: [0,1], header: {0: "latitude", 1:"longitude"}})
+```
+
+```{ojs}
+viewof resolution_input = Inputs.range([0, 15], {label: "Cell resolution", step: 1});
+numcells = h3.getNumCells(resolution_input);
+```
+
+There are ${new Intl.NumberFormat().format(numcells)} cells at: ${resolution_input}.
+
+<div id="cesiumContainer"></div>
+
+```{ojs}
+//| output: false
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzk3NjkyMy1iNGI1LTRkN2UtODRiMy04OTYwYWE0N2M3ZTkiLCJpZCI6Njk1MTcsImlhdCI6MTYzMzU0MTQ3N30.e70dpNzOCDRLDGxRguQCC-tRzGzA-23Xgno5lNgCeB4';
+
+viewer = await new Cesium.Viewer("cesiumContainer");
+```
+
+```{ojs}
+//| output: false
+function getH3CellsAtResolution(resolution) {
+    if (resolution === undefined) {
+        resolution = 0;
+    } else if (resolution > 3) {
+        resolution = 3;
+    }
+    let cells = h3.getRes0Cells();
+    if (resolution > 0) {
+        let cells1 = [];
+        for (const cell of cells) {
+            cells1 = cells1.concat(h3.cellToChildren(cell, resolution));
+        }
+        cells = cells1;
+    }
+    return cells
+}
+
+function getH3CellsAsGeoJSON(resolution) {
+    console.log("getH3CellsAsGeoJSON()");
+
+    const cells = getH3CellsAtResolution(resolution);
+    const geoj = {
+        "type":"FeatureCollection",
+        "features": []
+    }
+    for (const cell of cells) {
+        geoj.features.push({
+            "id": cell,
+            "type":"Feature",
+            "geometry": {
+                "type":"Polygon",
+                "coordinates": [h3.cellToBoundary(cell, true)]
+            },
+            "properties":{
+                "h3":cell
+            }
+        });
+    };
+    return geoj;
+}
+
+function getH3CellsAsCesiumPolygons(feature_collection, resolution) {
+    // Populates feature_collection with global coverage of H3 Cell polygons
+    const cells = getH3CellsAtResolution(resolution);
+    for (const cell of cells) {
+        const coords = h3.celltoBoundary(cell, false);
+    }
+}
+
+
+function getH3Points(collection) {
+    const cells = h3.getRes0Cells();
+    let cells1 = [];
+    for (const cell of cells) {
+        cells1 = cells1.concat(h3.cellToChildren(cell, 1));
+    }
+    for (const cell of cells1) {
+        const ltlg = h3.cellToLatLng(cell);
+        collection.add({
+            id: cell,
+            position: Cesium.Cartesian3.fromDegrees(ltlg[1], ltlg[0], 10),
+            pixelSize: 3,
+            color: Cesium.Color.YELLOW
+        })
+    }
+}
+
+function getCellsVisible(v, entities) {
+    const frustum = v.scene.camera.frustum;
+    const cameraPosition = v.camera.position;
+    const cullingVolume = frustum.computeCullingVolume(cameraPosition, v.camera.direction, v.camera.up);
+    const occludedEllipsoid = Cesium.Ellipsoid.WGS84;
+    const occluder = new Cesium.EllipsoidalOccluder(occludedEllipsoid, cameraPosition);
+    const intersect_tests = [Cesium.Intersect.INSIDE, Cesium.Intersect.INTERSECTING];
+    //const intersect_tests = [Cesium.Intersect.INSIDE];
+    let visibles = [];
+    for (let i=0; i< entities.values.length; i++) {
+        const ent = entities.values[i];
+        if (ent.show) {
+            const bs = Cesium.BoundingSphere.fromPoints(ent.polygon.hierarchy.valueOf().positions);
+            if (bs !== undefined) {
+                if (occluder.isPointVisible(bs.center)) {
+                    if (intersect_tests.includes(cullingVolume.computeVisibility(bs))) {
+                        visibles.push(ent.id);
+                    }
+                }
+            }
+        }
+    }
+    let resolution = 1;
+    while ((visibles.length < 6) && (resolution < 3)){
+        console.log(`resolution = ${resolution} viibles = ${visibles.length}`);
+        let tmp = [];
+        for (const cell of visibles) {
+            tmp = tmp.concat(h3.cellToChildren(cell, resolution));
+        }
+        visibles = tmp;
+        resolution = resolution + 1;
+        console.log(`resolution = ${resolution} viibles = ${visibles.length}`);
+    }   
+    console.log(`resolution = ${resolution} viibles = ${visibles.length}`);
+    /*try {
+        return h3.compactCells(visibles);
+    } catch (e) {
+        console.log(e);
+    }*/
+    return visibles;
+}
+
+
+
+h3_0 = new Cesium.GeoJsonDataSource("h3_0");
+//const h3p = new Cesium.PointPrimitiveCollection();
+//getH3Points(h3p);
+//viewer.scene.primitives.add(h3p);
+
+viewer.dataSources.add(h3_0);
+await h3_0.load(
+    getH3CellsAsGeoJSON(0),
+    {
+        "stroke": Cesium.Color.ORANGE,
+        "fill": Cesium.Color.YELLOW
+    }
+);
+
+function handleCameraEndEvent() {
+    return;
+    const dsa = viewer.dataSources.getByName("h3_0");
+    if (dsa.length === 0) {
+        return;
+    }
+}
+
+viewer.camera.moveEnd.addEventListener(function() {
+    const dsa = viewer.dataSources.getByName("h3_0");
+    if (dsa.length === 0) {
+        return;
+    }
+    const visibleCells = getCellsVisible(viewer, h3_0.entities);
+    //const visibleCells = getCellsVisible(viewer, dsa[0].entities);
+    //const visibleCells = getCellsVisible(viewer, h3p);
+    visible_cells.value = visibleCells.join(", ");
+});
+```
+Visible cells:
+```{ojs}
+visible_cells = Inputs.textarea({
+    label:"Cells",
+    placeholder:"",
+    value:"",
+    width:"90%"
+})
+```
+
+When rendering large data, not all the content can be retrieved and shown at once. Instead, only records that are visible should be retrieved and rendered. One approach for achieving this is to determine the set of H3 cells that are visible and use those H3 index values to retrieve corresponding records.
+
+Determining visible cells is a bit more challenging than expected. In Cesium a simple bounding box test works fine when the horizon is not visible, the anter-meridian is not traversed, and the poles are not visible. An alternative approach is to use the bounding spheres of the test objects (i.e. the H3 cells), and test if those spheres intersect with the view frustrum. Note that this will pick up enitites on the other side of the planet since those entities are within the view frustrum. Hence it is necessary to also include the planet as an occulder. So the test is basically, if the bounding sphere of the entity is within the view frustrum and not occluded by the planet, then the entity is visible.
+
+This approach works reasonably well at country to whole planet scales, but tends to fail at finer resolutions because the simple test of the bounding sphere intersection relies on testing the center point of the cell bounding sphere, which is often not in the view at the finer resolutions. An alternative may be to use the center point of the view to find a target cell and expand from there (neighbors, finer H3 resolution). This approach may be challenged at low angle view points, where the viewer focus tends to be the foreground rather than the center.
+
+

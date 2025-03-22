@@ -1,0 +1,100 @@
+---
+title: Using Duckdb WASM in Quarto
+---
+
+The version of DuckDB deployed in Quarto ojs cells is very old:
+```{ojs}
+db = await DuckDBClient.of();
+Inputs.table(db.query("select version() as version;"));
+```
+
+
+Import the current version directly from jsdelivr:
+```{ojs}
+duckdb = import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm/+esm")
+duckdb.PACKAGE_VERSION
+```
+
+Instantiate a database instance:
+```{ojs}
+bundles = duckdb.getJsDelivrBundles();
+bundle = duckdb.selectBundle(bundles);
+async function makeDB() {
+  const logger = new duckdb.ConsoleLogger();
+  const worker = await duckdb.createWorker(bundle.mainWorker);
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+  await db.instantiate(bundle.mainModule);
+  return db
+}
+db2 = makeDB();
+db2.getVersion();
+```
+
+```{ojs}
+result = {
+    const cn = await db2.connect();
+    const result = cn.query('select version() as version');
+    await cn.close();
+    return result;
+}
+Inputs.table(result);
+```
+
+```{ojs}
+cn = {
+    const cn = await db2.connect();
+    cn.query("CREATE TABLE test (a INTEGER PRIMARY KEY, b VARCHAR)");
+    cn.query("INSERT INTO test VALUES (1, 'test1');")
+    return cn;
+}
+```
+
+```{ojs}
+result3 = {
+    const result = cn.query("select * from test");
+    return result
+}
+Inputs.table(result3);
+```
+
+
+```{ojs}
+cn2 = {
+    const cn = await db2.connect();
+    cn.query("install httpfs;");
+    cn.query("load httpfs;");
+    cn.query("CREATE VIEW node AS SELECT * FROM read_parquet('https://storage.googleapis.com/opencontext-parquet/oc_isamples_pqg.parquet')");
+    return cn;
+}
+```
+
+```{ojs}
+Inputs.table(cn2.query("select count(*) as n from node;"));
+```
+
+```{ojs}
+Inputs.table(cn2.query("SELECT pid, latitude, longitude FROM node WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 100;"));
+```
+
+
+---
+
+See also:
+
+- https://observablehq.com/d/0efa27c4718edd6a
+- https://www.npmjs.com/package/@duckdb/duckdb-wasm
+- https://rud.is/drop/2024-02-19/vanilla/ Vanilla JS DuckDB with Tabulator
+- SQL Workbench https://tobilg.com/using-duckdb-wasm-for-in-browser-data-engineering
+- https://observablehq.com/@hrbrmstr/duckdb-observable-companion-to-the-quarto-version
+- https://github.com/hrbrmstr/duckdb-in-ojs?tab=readme-ov-file
+- https://observablehq.com/@kimmolinna/duckdb-latest/2
+- https://observablehq.com/@cmudig/duckdb
+
+
+sqlite:
+- https://observablehq.com/@mjbo/sqljs-httpvfs
+- https://sqlite-wasm-http.momtchev.com/
+- https://sqlite.org/wasm/doc/trunk/index.md
+
+Other:
+- https://www.crumplab.com/blog/662_quarto_portfolio/index.html

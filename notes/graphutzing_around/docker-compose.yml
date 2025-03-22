@@ -1,0 +1,11 @@
+version: '3'
+services:
+  solr:
+    image: solr
+    ports:
+      - "18983:8983"
+    volumes:
+      - "solrdata:/var/solr"
+    command: solr -f -cloud
+volumes:
+  solrdata:

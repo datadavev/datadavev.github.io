@@ -1,0 +1,84 @@
+# Testing Quarto
+
+Using this folder for testing some aspects of Quarto.
+
+
+## Tikz
+```{r, engine='tikz'}
+#| echo: false
+#| fig-cap: "Bee Seasons"
+#| fig-align: left
+#| out-width: 3cm
+%\usetikzlibrary{hobby}
+\newcommand*{\xMin}{-5}%
+\newcommand*{\xMax}{5}%
+\newcommand*{\yMin}{-6}%
+\newcommand*{\yMax}{3}%
+\begin{tikzpicture}
+
+%    \foreach \i in {\xMin,...,\xMax} {
+%        \draw [very thin,gray] (\i,\yMin) -- (\i,\yMax)  node [below] at (\i,\yMin) {$\i$};
+%    }
+%    \foreach \i in {\yMin,...,\yMax} {
+%        \draw [very thin,gray] (\xMin,\i) -- (\xMax,\i) node [left] at (\xMin,\i) {$\i$};
+%    }
+%\draw [line width=1mm, lightgray] (0,-5.5) to[curve through={
+%  (1.7, -3) (-1, 0) (-3.5, -1.5)  (-1,-3) (1.5,0) (0,1.5) 
+%  (-1.5,0) (1, -3) (3.5,-1.5) (1,0) (-1.7,-3)
+%}] (0,-5.5);
+
+\draw[line width = 1mm, black] (-1.5,1.5) -- (2,-2)
+-- (2.5,-1.5) -- (2, -1) 
+-- (1, -2) -- (2, -3) -- (3.5, -1.5) -- (2, 0)
+-- (-1, -3) -- (0.5, -4.5) -- (0, -5.5)
+-- (-0.5, -4.5) -- (1, -3) -- (-2, 0)
+-- (-3.5, -1.5) -- (-2, -3) -- (-1, -2)
+-- (-2, -1) -- (-2.5, -1.5) -- (-2,-2) -- (1.5, 1.5);
+
+\end{tikzpicture}
+```
+
+```{r, engine='tikz'}
+#| echo: false
+#| fig-cap: A circle of numbered circles
+#| fig-align: left
+#| out-width: 6cm
+
+\begin{tikzpicture}
+
+\def \n {5}
+\def \radius {3cm}
+\def \margin {8} % margin in angles, depends on the radius
+
+\foreach \s in {1,...,\n}
+{
+  \node[draw, circle] at ({360/\n * (\s - 1)}:\radius) {$\s$};
+  \draw[->, >=latex] ({360/\n * (\s - 1)+\margin}:\radius)
+    arc ({360/\n * (\s - 1)+\margin}:{360/\n * (\s)-\margin}:\radius);
+}
+\end{tikzpicture}
+```
+
+```{r, engine='tikz'}
+#| echo: false
+#| fig-cap: "Complete pooling"
+#| fig-align: center
+#| out-width: 100%
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.geometric}
+\begin{tikzpicture}[{every node/.append style}=draw]
+  \node [rectangle] (pop) at (0, 4) {Population};
+  \node [ellipse] (y1) at (-5, 2.5) {$y_1$};
+  \node [ellipse] (y2) at (-3, 2.5) {$y_2$};
+  \node [ellipse] (y3) at (-1, 2.5) {$y_3$};
+  \node [ellipse] (y4) at (1, 2.5) {$y_4$};
+  \node [ellipse, draw=white] (ydots) at (3, 2.5) {$\dots$};
+  \node [ellipse] (yn) at (5, 2.5) {$y_n$};
+  \draw [-latex] (pop) to (y1);
+  \draw [-latex] (pop) to (y2);
+  \draw [-latex] (pop) to (y3);
+  \draw [-latex] (pop) to (y4);
+  \draw [-latex, dashed] (pop) to (ydots);
+  \draw [-latex] (pop) to (yn);
+\end{tikzpicture}
+```

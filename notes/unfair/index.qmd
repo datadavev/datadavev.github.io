@@ -1,0 +1,17 @@
+---
+title: UnFAIR
+author: Dave Vieglais
+date: 2022-04-09
+categories: [society, behavior, FAIR, data]
+---
+
+Unexpected consequences of academic altruism.
+
+An interesting article on recognition of data contributors, @TimeRecognizeAuthorship2022. Open data contributors (those offering their data for free via public services) were more likely to be listed as contributors than authors. Closed data contributors were more likely to be listed as authors. Hence, there is an incentive to not openly share data, since doing so decreases opportunity for being recognized as an author, and authorship is a more valuable recognition than contributor.
+
+doi: https://doi.org/10.1038/d41586-022-00921-x
+
+Those that do not make their data public are more likely to be authors on papers using the data than those that make their public. The later are more likely to be listed as contributors.
+
+Thus there is an anti-incentive for sharing data publicly following the FAIR and data citation guidelines.
+

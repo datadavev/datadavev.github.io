@@ -1,0 +1,15 @@
+---
+title: "About"
+subtitle: "Absence of evidence is not evidence of absence"
+---
+
+A collection of notes, and an experiment thereof.
+
+See also:
+
+* [iSamples GitHub](https://github.com/isamplesorg)
+* [DataONE GitHub](https://github.com/dataoneorg)
+* [ARK Alliance](https://arks.org/)
+* [Personal GitHub](https://github.com/datadavev)
+
+Built with [Quarto](https://quarto.org/)

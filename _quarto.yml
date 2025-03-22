@@ -1,0 +1,69 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - "*.qmd"
+    - "!ignored"
+
+website:
+  title: "datadavev.github.io"
+  sidebar:
+    style: "floating"
+    search: true
+    contents:
+      - section: "About"
+        contents:
+          - href: index.qmd
+            text: Home
+          - about.qmd    
+      - section: "CesiumJS"
+        contents:
+          - href: notes/cesium_viewer/index.qmd
+            text: "Basic Viewer"
+          - href: notes/cesium_viewer/view_overlay.qmd
+            text: "Information Overlay"
+          - href: notes/cesium_viewer/view_bounds.qmd
+            text: "View Bounds"
+          - href: notes/cesium_viewer/altitude.qmd
+            text: "Altitude Calculations"
+      - section: "DuckDB"
+        contents:
+          - href: notes/duckdb/index.qmd
+            text: "DuckdDB"
+          - href: notes/duckdb/vanilla.qmd
+            text: "Duckdb with Vanilla Javascript"
+
+      - section: "Data"
+        contents:
+          - href: notes/duckdb/index.qmd
+            text: "DuckdDB"
+          - href: notes/cesium_viewer/index.qmd
+            text: "CesiumJS"
+          - href: notes/identifiers/index.qmd
+            text: "Identifier Model"
+          - href: notes/identifiers/resolvers.qmd
+            text: "Identifier Resolution"
+      - section: "Miscellanea"
+        contents:
+          - href: notes/conspiracy/index.qmd
+            text: Conspiracy
+      - section: "Property"
+
+format:
+  html:
+    theme: 
+      light: [cosmo, styles.scss]
+      dark: [darkly, styles.scss]
+    ##linestretch: "1.5"
+    ##fontsite: 22px
+    #fontcolor: "#000"
+
+filters:
+  - diagram
+  #- filters/diagram-generator.lua
+  - quarto
+  #- pandoc-plantuml
+  #- /usr/local/bin/pandoc-include-code
+
+bibliography: datadavev.bib
+csl: chicago-author-date.csl

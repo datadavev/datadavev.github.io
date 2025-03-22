@@ -1,0 +1,29 @@
+---
+title: "datadavev.github.io"
+jupyter: python3
+date-format: iso
+listing:
+  - id: notes-listing
+    contents: "notes"
+    page-size: 33
+    sort: "title asc"
+    fields: [title, categories, date]
+    type: grid
+  - id: property-listing
+    contents: "property"
+    page-size: 33
+    sort: "title asc"
+    fields: [title, categories, date]
+    type: grid
+
+suppress-bibliography: true
+---
+
+::: {#notes-listing}
+:::
+
+
+## Property
+
+::: {#property-listing}
+:::

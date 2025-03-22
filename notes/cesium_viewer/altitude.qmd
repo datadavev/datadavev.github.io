@@ -1,0 +1,472 @@
+---
+title: "Altitude on Cesium View"
+author: Dave Vieglais
+date: 2025-03-11
+abstract: Compute various elevations.
+tags: [spatial, visualize, data]
+categories: [data, recipe]
+#execute:
+#  echo: false
+---
+
+In this page a combination of the Javascript implementation of the earth gravity model (@vandry_VandryGeoidheight_2025, @hanagan_GeoidHeightCalculator_2024, @mershon_GeoidHeightFunction_2022) interpolation using the EGM2008 dataset (@@_GeoidsDownload_2025) is used (code below) in conjunction with a [CesiumJS](https://cesium.com/platform/cesiumjs/) view of the globe to show various estimates of elevation at the location of the mouse cursor.
+
+```{ojs}
+//| code-fold: true
+// Slightly modified from https://observablehq.com/@earthscope/geoid-height-function/2
+//
+// \file Geoid.cpp
+// \brief Implementation for GeographicLib::Geoid class
+//
+// Copyright (c) Charles Karney (2009) <charles@karney.com>
+// and licensed under the LGPL.  For more information, see
+// http://geographiclib.sourceforge.net/
+// model is a string specifying a particular geoid model dataset to be loaded
+// Resolves a function when the dataset has been loaded that can be called with
+// lat, long, and cubic interpolation flag to calculate the geoid height above a geoid of a point.
+
+cubic_properties = {
+  const cubic_properties = {
+    c0: 240,
+    c3: [
+          [  9, -18, -88,    0,  96,   90,   0,   0, -60, -20],
+          [ -9,  18,   8,    0, -96,   30,   0,   0,  60, -20],
+          [  9, -88, -18,   90,  96,    0, -20, -60,   0,   0],
+          [186, -42, -42, -150, -96, -150,  60,  60,  60,  60],
+          [ 54, 162, -78,   30, -24,  -90, -60,  60, -60,  60],
+          [ -9, -32,  18,   30,  24,    0,  20, -60,   0,   0],
+          [ -9,   8,  18,   30, -96,    0, -20,  60,   0,   0],
+          [ 54, -78, 162,  -90, -24,   30,  60, -60,  60, -60],
+          [-54,  78,  78,   90, 144,   90, -60, -60, -60, -60],
+          [  9,  -8, -18,  -30, -24,    0,  20,  60,   0,   0],
+          [ -9,  18, -32,    0,  24,   30,   0,   0, -60,  20],
+          [  9, -18,  -8,    0, -24,  -30,   0,   0,  60,  20],
+        ],
+    c0n: 372,
+    c3n: [
+        [  0, 0, -131, 0,  138,  144, 0,   0, -102, -31],
+        [  0, 0,    7, 0, -138,   42, 0,   0,  102, -31],
+        [ 62, 0,  -31, 0,    0,  -62, 0,   0,    0,  31],
+        [124, 0,  -62, 0,    0, -124, 0,   0,    0,  62],
+        [124, 0,  -62, 0,    0, -124, 0,   0,    0,  62],
+        [ 62, 0,  -31, 0,    0,  -62, 0,   0,    0,  31],
+        [  0, 0,   45, 0, -183,   -9, 0,  93,   18,   0],
+        [  0, 0,  216, 0,   33,   87, 0, -93,   12, -93],
+        [  0, 0,  156, 0,  153,   99, 0, -93,  -12, -93],
+        [  0, 0,  -45, 0,   -3,    9, 0,  93,  -18,   0],
+        [  0, 0,  -55, 0,   48,   42, 0,   0,  -84,  31],
+        [  0, 0,   -7, 0,  -48,  -42, 0,   0,   84,  31],
+    ],
+    c0s: 372,
+    c3s: [
+        [ 18,  -36, -122,   0,  120,  135, 0,   0,  -84, -31],
+        [-18,   36,   -2,   0, -120,   51, 0,   0,   84, -31],
+        [ 36, -165,  -27,  93,  147,   -9, 0, -93,   18,   0],
+        [210,   45, -111, -93,  -57, -192, 0,  93,   12,  93],
+        [162,  141,  -75, -93, -129, -180, 0,  93,  -12,  93],
+        [-36,  -21,   27,  93,   39,    9, 0, -93,  -18,   0],
+        [  0,    0,   62,   0,    0,   31, 0,   0,    0, -31],
+        [  0,    0,  124,   0,    0,   62, 0,   0,    0, -62],
+        [  0,    0,  124,   0,    0,   62, 0,   0,    0, -62],
+        [  0,    0,   62,   0,    0,   31, 0,   0,    0, -31],
+        [-18,   36,  -64,   0,   66,   51, 0,   0, -102,  31],
+        [ 18,  -36,    2,   0,  -66,  -51, 0,   0,  102,  31],
+    ]
+  };
+  return cubic_properties;
+}
+
+geoid_data_files = {
+  const geoid_data_files = {
+          //"egm84-15": FileAttachment("egm84-15.pgm").arrayBuffer(),
+          //"egm84-30": FileAttachment("egm84-30.pgm").arrayBuffer(),
+          //"egm96-5": FileAttachment("egm96-5.pgm").arrayBuffer(),
+          //"egm96-15": FileAttachment("egm96-15.pgm").arrayBuffer(),
+          "egm2008-5": FileAttachment("egm2008-5.pgm").arrayBuffer()
+        };
+  return geoid_data_files;
+};
+
+/**
+ * Return a geoid calculator function for the provided model.
+ * 
+ * The model is a key to the dict of geoid_data_files.
+ */
+async function geoid(model) {
+    let buffer = await geoid_data_files[model];
+    return new Promise(function (resolve, reject) {
+        resolve(new Uint8Array(buffer));
+    }).then(function (rawfile) {
+        if (
+        !(
+            rawfile[0] === 80 &&
+            rawfile[1] === 53 &&
+            ((rawfile[2] === 13 && rawfile[3] === 10) || rawfile[2] === 10)
+            )
+        ) {
+            throw new Error("Geoid model file: no PGM header");
+        }
+        var i = rawfile[2] === 13 ? 4 : 3;
+        var offset = null;
+        var scale = null;
+
+        function getline() {
+            var start = i;
+            for (var j = i; ; j++) {
+                if (j >= rawfile.length) {
+                    throw new Error("Geoid model file: missing newline in header");
+                }
+                if (rawfile[j] === 10) {
+                    i = j + 1;
+                    break;
+                }
+            }
+            if (j > start && rawfile[j - 1] === 13) {
+                j--;
+            }
+            return String.fromCharCode.apply(null, rawfile.slice(start, j));
+        }
+
+        var m, s;
+        for (;;) {
+            s = getline();
+            if (s[0] !== "#") {
+                break;
+            }
+            m = s.match(/^# Offset (.*)$/);
+            if (m) {
+                offset = parseInt(m[1], 10);
+                if (!isFinite(offset)) {
+                    throw new Error("Geoid model file: bad offset " + m[1]);
+                }
+            } else {
+                m = s.match(/^# Scale (.*)$/);
+                if (m) {
+                    scale = parseFloat(m[1]);
+                    if (!isFinite(scale)) {
+                        throw new Error("Geoid model file: bad scale " + m[1]);
+                    }
+                }
+            }
+        }
+
+        m = s.match(/^\s*(\d+)\s+(\d+)\s*$/);
+        var width = null;
+        var height = null;
+        if (m) {
+            width = parseInt(m[1], 10);
+            height = parseInt(m[2], 10);
+        }
+        if (!(m && width >= 0 && height >= 0)) {
+            throw new Error("Geoid model file: bad PGM width&height line");
+        }
+        var levels = parseInt(getline());
+        if (levels != 65535) {
+            throw new Error(
+                "Geoid model file: PGM file must have 65535 gray levels"
+            );
+        }
+        if (offset === null) {
+            throw new Error("Geoid model file: PGM file does not contain offset");
+        }
+        if (scale === null) {
+            throw new Error("Geoid model file: PGM file does not contain scale");
+        }
+        if (width < 2 || height < 2) {
+            throw new Error("Geoid model file: Raster size too small");
+        }
+
+        var payload_len = rawfile.length - i;
+        if (payload_len !== width * height * 2) {
+            throw new Error("Geoid model file: File has the wrong length");
+        }
+
+        return {
+            scale: scale,
+            offset: offset,
+            width: width,
+            height: height,
+            rlonres: width / 360,
+            rlatres: (height - 1) / 180,
+            rawval: function (ix, iy) {
+                if (iy < 0) {
+                    iy = -iy;
+                    ix += width / 2;
+                } else if (iy >= height) {
+                    iy = 2 * (height - 1) - iy;
+                    ix += width / 2;
+                }
+                if (ix < 0) {
+                    ix += width;
+                } else if (ix >= width) {
+                    ix -= width;
+                }
+                var k = (iy * width + ix) * 2 + i;
+                return (rawfile[k] << 8) | rawfile[k + 1];
+            }
+        };
+    })    .then(function (model) {
+      var cached_ix = null;
+      var cached_iy = null;
+      var v00 = null;
+      var v01 = null;
+      var v10 = null;
+      var v11 = null;
+      var t = null;
+
+      /**
+       * The returned function for computing geoid height.
+       * 
+       * lat:float = latitude in degrees
+       * lon:float  = longitude in degrees
+       * cubic: bool = use cubic spline interpolation (default = false)
+       */
+      return function (lat, lon, cubic) {
+        if (lon < 0) {
+          lon += 360;
+        }
+        let fy = (90 - lat) * model.rlatres;
+        let fx = lon * model.rlonres;
+        let iy = Math.floor(fy);
+        let ix = Math.floor(fx);
+        fx -= ix;
+        fy -= iy;
+        if (iy === model.height - 1) {
+          iy--;
+        }
+
+        if (cached_ix !== ix || cached_iy !== iy) {
+          cached_ix = ix;
+          cached_iy = iy;
+          if (cubic) {
+            var c3x = cubic_properties.c3;
+            var c0x = cubic_properties.c0;
+            if (iy === 0) {
+              c3x = cubic_properties.c3n;
+              c0x = cubic_properties.c0n;
+            } else if (iy === model.height - 2) {
+              c3x = cubic_properties.c3s;
+              c0x = cubic_properties.c0s;
+            }
+            var v = [
+              model.rawval(ix, iy - 1),
+              model.rawval(ix + 1, iy - 1),
+              model.rawval(ix - 1, iy),
+              model.rawval(ix, iy),
+              model.rawval(ix + 1, iy),
+              model.rawval(ix + 2, iy),
+              model.rawval(ix - 1, iy + 1),
+              model.rawval(ix, iy + 1),
+              model.rawval(ix + 1, iy + 1),
+              model.rawval(ix + 2, iy + 1),
+              model.rawval(ix, iy + 2),
+              model.rawval(ix + 1, iy + 2)
+            ];
+            t = Array.apply(null, Array(10)).map(function (_, i, arr) {
+              return (
+                v.reduce(function (acc, vj, j, arr) {
+                  return acc + vj * c3x[j][i];
+                }, 0) / c0x
+              );
+            });
+          } else {
+            v00 = model.rawval(ix, iy);
+            v01 = model.rawval(ix + 1, iy);
+            v10 = model.rawval(ix, iy + 1);
+            v11 = model.rawval(ix + 1, iy + 1);
+          }
+        }
+
+        var h = null;
+        if (cubic) {
+          h =
+            t[0] +
+            fx * (t[1] + fx * (t[3] + fx * t[6])) +
+            fy *
+              (t[2] +
+                fx * (t[4] + fx * t[7]) +
+                fy * (t[5] + fx * t[8] + fy * t[9]));
+        } else {
+          var a = (1 - fx) * v00 + fx * v01;
+          var b = (1 - fx) * v10 + fx * v11;
+          h = (1 - fy) * a + fy * b;
+        }
+        return model.offset + model.scale * h;
+      };
+    });
+}
+
+/**
+ * Create a function for computing the geoid height using the egm2008 global model.
+ * Signature is: (latitude:float, longitude:float, cublib:bool=false)->float
+ */
+egm2008 = await geoid("egm2008-5");
+```
+
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet"></link>
+<style>
+    div.cesium-topleft {
+        display: block;
+        position: absolute;
+        background: #00000055;
+        color: white;
+        height: auto;
+        z-index: 999;
+        font-family: Cousine, fixed;
+        font-size: 0.6rem;
+    }
+</style>
+
+<div id="cesiumContainer"></div>
+
+```{ojs}
+//| output: false
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzk3NjkyMy1iNGI1LTRkN2UtODRiMy04OTYwYWE0N2M3ZTkiLCJpZCI6Njk1MTcsImlhdCI6MTYzMzU0MTQ3N30.e70dpNzOCDRLDGxRguQCC-tRzGzA-23Xgno5lNgCeB4';
+```
+
+```{ojs}
+//| code-fold: true
+/**
+ * From: https://sandcastle.cesium.com/?src=Custom%20Geocoder.html
+ * 
+ * This class is an example of a custom geocoder. It provides geocoding through the OpenStreetMap Nominatim service.
+ * @alias OpenStreetMapNominatimGeocoder
+ * @constructor
+ */
+class OpenStreetMapNominatimGeocoder{
+
+    /**
+     * The function called to geocode using this geocoder service.
+     *
+     * @param {string} input The query to be sent to the geocoder service
+     * @returns {Promise<GeocoderService.Result[]>}
+     */
+    geocode(input) {
+        const endpoint = "https://nominatim.openstreetmap.org/search";
+        const resource = new Cesium.Resource({
+            url: endpoint,
+            queryParameters: {
+            format: "json",
+            q: input,
+            },
+        });
+
+        return resource.fetchJson().then(function (results) {
+            let bboxDegrees;
+            return results.map(function (resultObject) {
+            bboxDegrees = resultObject.boundingbox;
+            return {
+                displayName: resultObject.display_name,
+                destination: Cesium.Rectangle.fromDegrees(
+                bboxDegrees[2],
+                bboxDegrees[0],
+                bboxDegrees[3],
+                bboxDegrees[1],
+                ),
+            };
+            });
+        });
+    };
+}
+
+/**
+ * Get the cesium-widget div created under the container div.
+ */
+function getCesiumWidget(ele) {
+    const container = document.getElementById(ele);
+    return container.querySelector(".cesium-widget");
+}
+
+/**
+ * Create a semi-transparent div that sits on top of the vesium-widget
+ */
+function createOverlayElement(ele, width="140px") {
+    const overlay = document.createElement("div")
+    overlay.setAttribute("class", "cesium-topleft");
+    overlay.style.width = width;
+    const container = getCesiumWidget(ele)
+    container.insertBefore(overlay, container.firstChild);
+    return overlay;
+}
+
+
+class CView {
+    constructor(target) {
+        this.viewer = new Cesium.Viewer(
+        target, {
+            timeline: false,
+            animation: false,
+            baseLayerPicker: false,
+            geocoder: new OpenStreetMapNominatimGeocoder(),
+            fullscreenElement: target,
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+        });
+        this.overlay = createOverlayElement(target, "200px"); 
+        this.mouseMoveHandler = null;
+    }
+
+    async handleMouseMove(event) {
+        const ray = this.viewer.camera.getPickRay(event.position);
+        const mousePosition = this.viewer.scene.globe.pick(ray, this.viewer.scene);
+        if (Cesium.defined(mousePosition)) {
+            var cartographic = Cesium.Cartographic.fromCartesian(mousePosition);
+            var cheight = cartographic.height;
+            var gheight = this.viewer.scene.globe.getHeight(cartographic);
+            this.showLocation(cartographic.longitude, cartographic.latitude, cheight, gheight);
+        }
+    }
+    setMouseMoveHandler() {
+        this.mouseMoveHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+        // hold a reference to this for use in the created function
+        const self = this;
+        this.mouseMoveHandler.setInputAction(async function(event) {
+            const ray = self.viewer.camera.getPickRay(event.endPosition);
+            const mousePosition = self.viewer.scene.globe.pick(ray, self.viewer.scene);
+            if (Cesium.defined(mousePosition)) {
+                const cartographic = Cesium.Cartographic.fromCartesian(mousePosition);
+                const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+                const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+                const cheight = cartographic.height;
+                const gheight = self.viewer.scene.globe.getHeight(cartographic);
+                const theHeights = await Cesium.sampleTerrainMostDetailed(self.viewer.terrainProvider, [cartographic], true);
+                const ellips_height = theHeights[0].height;
+                const egm_height = egm2008(latitude, longitude);
+                const mslh = ellips_height - egm_height;
+                const cameraPosition = self.viewer.scene.camera.positionWC;
+                const ellipsoidPosition = self.viewer.scene.globe.ellipsoid.scaleToGeodeticSurface(cameraPosition);
+                const distance = Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(cameraPosition, ellipsoidPosition, new Cesium.Cartesian3()));
+                self.overlay.innerHTML = `<table>
+<tr><td>Latitude</td><td>${latitude.toFixed(3)}</tr>
+<tr><td>Longitude</td><td>${longitude.toFixed(3)}</td></tr>
+<tr><td>Camera h(km)</td><td>${(distance/1000).toFixed(1)}</td></tr>
+<tr><td>Carto h(m)</td><td>${cheight.toFixed(1)}</td></tr>
+<tr><td>Globe h(m)</td><td>${gheight.toFixed(1)}</td></tr>
+<tr><td>Ellips h(m)</td><td>${ellips_height.toFixed(1)}</td></tr>
+<tr><td>Geoid h(m)</td><td>${egm_height.toFixed(1)}</td></tr>
+<tr><td>MSL h(m)</td><td>${mslh.toFixed(1)}</td></tr>
+</table>`; 
+            } else {
+                self.overlay.innerHTML = "";
+            }
+        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    }
+}
+
+content = new CView("cesiumContainer");
+_ = content.setMouseMoveHandler();
+```
+
+The overlay shows the latitude and longitude of the mouse cursor and the results of calculating various elevations at that location.
+
+| Property | Description |
+| - | ---- | 
+| `Camera d(km)` | The distance  in kilometers between the camera and the surface of the globe. |
+| `Carto h(m)` | The cartographic height in meters reported by the Cesium viewer for the mouse cursor position. This height is dependent on the calculation of the intersection of the pick ray with the rendered surface and so will not reflect actual elevation unless fairly zoomed in to the terrain[^1]. |
+| `Globe h(m)` | The globe height in meters reported by `viewer.scene.globe.getHeight()` for the location of the mouse cursor. Like "Carto h(n)", the returned value is dependent on the currently rendered view. |
+| `Ellips h(m)` | The height in meters of the terrain at the mouse cursor position above the WGS84 ellipsoid. |
+| `Geoid h(m)` | The height in meters of the geoid relative to the WGS84 ellipsoid at the mouse cursor position as calculated by the EGM 2008 gravitational model at 5 minute resolution. Note that this model provides an approximation suitable for global use and results may differ from those provided by models more finely tuned to specific regions (@fraczek_1MeanSeaLevel_2003). |
+| `MSL h(m)` | The height in meters relative to Mean Sea Level as estimated by the difference of the sllipsoid height and the geoid height at the position at the mouse cursor. |
+
+[^1]: [https://community.cesium.com/t/terrain-height-in-cesium/22705/2](https://community.cesium.com/t/terrain-height-in-cesium/22705/2)

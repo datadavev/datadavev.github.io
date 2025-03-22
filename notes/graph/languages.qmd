@@ -1,0 +1,39 @@
+---
+title: Graph Query Languages
+subtitle: Graph of languages for querying graphs
+author: Dave Vieglais
+---
+
+Relational databases have SQL. Graph databases have...
+
+https://gql.today/
+
+```{dot}
+digraph G {
+    subgraph cluster_pg {
+        label="Property Graphs";
+        color="grey"
+        GCORE [label="G-CORE"];
+        Gremlin -> GQL;
+        Cypher -> GQL;
+        GSQL -> GQL;
+        GCORE -> GQL;
+        PGQL -> GQL;
+    }
+
+    subgraph cluster_rdf {
+        label="RDF Graphs";
+        color="grey"
+        SPARQL;
+    }
+
+    AQL;
+    GraphQL;
+}
+```
+
+GraphQL is a query language for APIs.
+
+[Apache AGE](https://github.com/apache/incubator-age) is a good bet for the future, currently implementing Cypher. GQL is premature, and as an emergine ISO standard, is likely to be a few years before mature and generally available.
+
+How do you work with RDF graphs and property graphs in a single system? Property graphs seem to be a generalization of RDF graphs. Or the other way around. Both RDF and LPGs are composed of nodes and edges. In RDF, a node

@@ -1,0 +1,83 @@
+---
+title: Valilla-ish DuckDB WASM
+---
+
+Use the latest version of DuckDB WASM to poke around in a Parquet file.
+
+```{ojs}
+duckdb = import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm/+esm");
+
+async function instantiate(duckdb) {
+  const CDN_BUNDLES = duckdb.getJsDelivrBundles(),
+  bundle = await duckdb.selectBundle(CDN_BUNDLES), // Select a bundle based on browser checks
+  worker_url = URL.createObjectURL(
+    new Blob([ `importScripts("${bundle.mainWorker}");` ], {
+      type: "text/javascript"
+    })
+  );
+
+  // Instantiate the async version of DuckDB-WASM
+  const worker = new Worker(worker_url),
+  logger = new duckdb.ConsoleLogger("DEBUG"),
+  db = new duckdb.AsyncDuckDB(logger, worker);
+
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  URL.revokeObjectURL(worker_url);
+
+  return db;
+}
+
+DuckDB = await instantiate(duckdb);
+db = await DuckDB.connect();
+```
+
+```{ojs}
+version = {
+    const v = db.query("SELECT version() AS Version").then((result) => {
+        return result.get(0).Version;
+    });
+    return v;
+};
+```
+
+The version of Duckdb is: `{ojs} version`.
+
+Create a view of the parquet file `https://storage.googleapis.com/opencontext-parquet/oc_isamples_pqg.parquet`
+
+```{ojs}
+{
+    db.query("CREATE VIEW node AS SELECT * FROM read_parquet('https://storage.googleapis.com/opencontext-parquet/oc_isamples_pqg.parquet')");
+}
+```
+
+`otypes` in the node list and their counts:
+```{ojs}
+Inputs.table(db.query("SELECT otype, COUNT(*) AS n FROM node GROUP BY otype;"));
+```
+
+A few latitude, longitude values:
+```{ojs}
+viewof ltlgtable = Inputs.table(
+    db.query("SELECT pid, latitude, longitude FROM node WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 100;"), 
+    {required: false, multiple: false});
+```
+
+```{ojs}
+ltlgtable.pid;
+```
+
+This is ridiculously slow, find the subjects using the selected PID as the object:
+
+```{ojs}
+entry = {
+    let related = null;
+    if (ltlgtable) {
+        const q = await db.prepare("select s,p from node where otype='_edge_' and list_contains(o, ?);");
+        const params = [ltlgtable.pid, ];
+        console.log(params);
+        related = q.query(...params);
+    }
+    return related;
+}
+Inputs.table(entry);
+```

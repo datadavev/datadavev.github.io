@@ -1,0 +1,48 @@
+---
+title: Graphutzing around with Solr
+subtitle: Notes on querying graphs in Solr
+date: 2022-08-03
+---
+
+Some practical exploration of graph operations in Solr.
+
+Solr graph operations basically involve a breadth-first scan across documents connected by some property from a starting set of documents and optionally applying filters during the traversal or on the resulting set of documents.
+
+
+
+Examples in these pages use a default Solr setup using Docker, configured to expose Solr on port `18983` using the following `docker-compose` file:
+
+```{.yaml include=docker-compose.yml .numberLines}
+```
+
+Run the instance like `docker-compose up -d`. 
+
+Test data:
+```{.json include=test-data.json .numberLines .includeLink}
+```
+
+
+
+```{python}
+import json
+import graphutzing
+
+docs = json.load(open('test-data.json', 'r'))
+g = graphutzing.generateViz(docs)
+g
+```
+
+
+```{python}
+import igraph
+
+g = igraph.Graph()
+g.add_vertices(3)
+g.add_edges([(0,1), (1,2)])
+g.add_edges([(2, 0)])
+g.add_vertices(3)
+g.add_edges([(2, 3), (3, 4), (4, 5), (5, 3)])
+print(g)
+layout = g.layout("kk")
+igraph.plot(g, layout=layout)
+```

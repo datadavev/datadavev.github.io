@@ -1,0 +1,241 @@
+---
+title: "Cesium View Bounds"
+author: Dave Vieglais
+date: 2025-03-11
+abstract: Bounding box of the view in CesiumJS.
+tags: [spatial, visualize, data]
+categories: [data, recipe]
+execute:
+  echo: false
+#format: live-html
+---
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet"></link>
+
+
+"Patch" for Cesium camera `computeViewRectangle`.
+
+This path provides a modified implementation of `computeViewRectangle` that
+returns the correct view rectangle when the camera is oriented towards the south
+and the horizon is visible. The default implementation truncates the view rectangle
+at a lower corner of the view which can significantly reduce the reported view
+rectangle. 
+
+See [this gist](https://gist.github.com/datadavev/5579bc1a30b2c569a5e7e944f7564aeb) for an example that can be loaded into Sandcastle.
+
+<div id="cesiumContainer"></div>
+
+```{ojs}
+//| output: false
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzk3NjkyMy1iNGI1LTRkN2UtODRiMy04OTYwYWE0N2M3ZTkiLCJpZCI6Njk1MTcsImlhdCI6MTYzMzU0MTQ3N30.e70dpNzOCDRLDGxRguQCC-tRzGzA-23Xgno5lNgCeB4';
+```
+
+```{ojs}
+//| output: false
+VIEWER = new Cesium.Viewer(
+    'cesiumContainer', {
+        timeline: false,
+        animation: false,
+        baseLayerPicker: false,
+    });
+
+worldTerrain = await Cesium.createWorldTerrainAsync();
+VIEWER.scene.terrainProvider = worldTerrain;
+// Turn off the default globe so we can get to bathymetry view
+VIEWER.scene.globe.show = false;
+
+worldTileset = await Cesium.createGooglePhotorealistic3DTileset();
+VIEWER.scene.primitives.add(worldTileset);
+VIEWER.scene.globe.depthTestAgainstTerrain = true;
+
+// The global bounding box latitude and longitude values.
+GLOBAL_RECT = new Cesium.Rectangle(-Cesium.Math.PI, -Cesium.Math.PI_OVER_TWO, Cesium.Math.PI, Cesium.Math.PI_OVER_TWO);
+
+// This funky thing is how to create a simple object in Observable javascriptish:
+cache = {
+    const cache = {
+        bbEntity: null
+    };
+    return cache;
+}
+
+/**
+ * Scans vertically at x pixels min_y to max_y to find a pixel that intersect 
+ * the ellipsoid. 
+ *
+ * In screen space canvas, 0,0 is the top left corner.
+ * Returns the cartographic coordinates of the picked point or null if 
+ * there is no intersection.
+ */
+function computeHorizonPointY(camera, ellips, x, min_y, max_y) {
+    for (let j=min_y; j < max_y; j += 5) {
+        const cp = camera.pickEllipsoid(new Cesium.Cartesian2(x, j), ellips);
+        if (cp) {
+            return ellips.cartesianToCartographic(cp);
+        }
+    }
+    return null;
+}
+
+
+/**
+ * Compute if point is visible in current view
+ * p: Cartographic3
+ */
+function isPositionVisible(camera, ellips, cartesian) {
+    const frustum = camera.frustum;
+    const cullingVolume = frustum.computeCullingVolume(
+        camera.position,
+        camera.direction,
+        camera.up
+    );
+    const intersection = cullingVolume.computeVisibility(new Cesium.BoundingSphere(cartesian, 0.0));
+    if (intersection === Cesium.Intersect.INSIDE) {
+        const globeBoundingSphere = new Cesium.BoundingSphere(
+            Cesium.Cartesian3.ZERO,
+            ellips.minimumRadius
+        );
+        const occluder = new Cesium.Occluder(
+            globeBoundingSphere,
+            camera.position
+        )
+        return occluder.isPointVisible(cartesian);
+    }
+    return false;
+}
+
+
+/**
+ * Return 0 if neither visible, -1 for south, 1 for north
+ */
+ function isPoleVisible(camera, ellips) {
+  const NORTH_POLE = Cesium.Cartographic.toCartesian(
+      Cesium.Cartographic.fromDegrees(0.0, 90.0, 1.0, new Cesium.Cartographic()), 
+      ellips,
+      new Cesium.Cartesian3()
+  );
+  if (isPositionVisible(camera, ellips, NORTH_POLE)) {
+      return 1;
+  }
+  const SOUTH_POLE = Cesium.Cartographic.toCartesian(
+    Cesium.Cartographic.fromDegrees(0.0, -90.0, 1.0, new Cesium.Cartographic()), 
+    ellips,
+    new Cesium.Cartesian3()
+);
+if (isPositionVisible(camera, ellips, SOUTH_POLE)) {
+      return -1;
+  }
+  return 0;
+}
+
+
+/**
+ * Computes five cartographic points corresponding with the canvas top left,
+ * top middle, top right, lower right, and lower left.
+ * 
+ * The top three points are computed at the intersection of that column of pixels
+ * with the ellpsoid.
+ * 
+ * null is returned for any point that does not intersect with the ellpsoid.
+ */
+function computeViewHorizonPoints(canvas, camera, ellips) {
+    const xs = [0, Math.floor(canvas.width/2), canvas.width];
+    const points = [null, null, null, null, null];
+    for (let i=0; i<3; i++) {
+        points[i] = computeHorizonPointY(camera, ellips, xs[i], 0, canvas.height);        
+    }
+    points[3] = computeHorizonPointY(camera, ellips, xs[0], canvas.height-1, canvas.height);
+    points[4] = computeHorizonPointY(camera, ellips, xs[2], canvas.height-1, canvas.height);
+    return points;
+}
+
+
+/**
+ * Given a list of cartographic points, compute
+ * the bounding rectangle for the points.
+ */
+function pointsToBoundingRectangle(camera, ellips, points, result) {
+    for (let i=0; i < points.length; i++) {
+        if (!points[i]) {
+            return GLOBAL_RECT;
+        }
+    }    
+    result = Cesium.Rectangle.fromCartographicArray(points, result);
+    const pvisible = isPoleVisible(camera, ellips);
+    if (pvisible === 1) {
+        result.west = -Cesium.Math.PI;
+        result.east = Cesium.Math.PI;
+        result.north = Cesium.Math.PI_OVER_TWO;
+    } else if (pvisible === -1) {
+        result.west = -Cesium.Math.PI;
+        result.east = Cesium.Math.PI;
+        result.south = -Cesium.Math.PI_OVER_TWO;
+    }
+    return result;
+}
+
+
+/**
+ * Compute the (approximate) bounding rectangle of the camera view.
+ * 
+ * returns Cesium.Rectangle
+ */
+Cesium.Camera.prototype.computeViewRectangle2 = function(ellips, result) {
+  const points = computeViewHorizonPoints(this._scene.canvas, this, ellips);
+  return pointsToBoundingRectangle(this, ellips, points, result);
+}
+
+handler = new Cesium.ScreenSpaceEventHandler(VIEWER.canvas);
+handler.setInputAction((click) => {
+    const bb = VIEWER.camera.computeViewRectangle2(VIEWER.scene.globe.ellipsoid, new Cesium.Rectangle());
+    const toolbar = document.getElementById('cesiumContainer').getElementsByClassName("cesium-viewer-toolbar")[0];
+
+    /*toolbar.innerHTML = `<pre>
+        west: ${Cesium.Math.toDegrees(bb.west).toFixed(2)}
+        south:${Cesium.Math.toDegrees(bb.south).toFixed(2)}
+        east:${Cesium.Math.toDegrees(bb.east).toFixed(2)}
+        north:${Cesium.Math.toDegrees(bb.north).toFixed(2)}</pre>`;*/
+    bbsouth.value = Cesium.Math.toDegrees(bb.south).toFixed(2);
+    bbnorth.value = Cesium.Math.toDegrees(bb.north).toFixed(2);
+    bbwest.value = Cesium.Math.toDegrees(bb.west).toFixed(2);
+    bbeast.value = Cesium.Math.toDegrees(bb.east).toFixed(2);
+    if (bb === GLOBAL_RECT) {
+        if (cache.bbEntity) {
+            cache.bbEntity.display = false;
+        }
+        return;
+    };
+    if (cache.bbEntity !== null) {
+        cache.bbEntity.rectangle.coordinates = bb;
+        cache.bbEntity.display = true;
+    } else {
+        console.log("Create bbEntity");
+        cache.bbEntity = VIEWER.entities.add({
+            rectangle:{
+                coordinates: bb, 
+                material: Cesium.Color.RED.withAlpha(0.3),
+                clampToGround: true,
+                // Can't draw an outline when clamped to the ground and showing terrain.
+                //outline: true,
+                //outlineColor: Cesium.Color.YELLOW,
+                //outlineWidth: 5.0,
+                //height: 0
+            }
+        });
+    }
+}, Cesium.ScreenSpaceEventType.LEFT_UP);
+
+```
+```{ojs}
+bbwest = Inputs.text({label:"W", value:0.0});
+bbsouth = Inputs.text({label:"S", value:0.0});
+bbeast = Inputs.text({label:"E", value:0.0});
+bbnorth = Inputs.text({label:"N", value:0.0});
+```
+
+|  |  |  |
+| -- | -- | -- |
+|  | `{ojs} bbnorth` | |
+| `{ojs} bbwest` |  | `{ojs} bbeast` |
+|  | `{ojs} bbsouth` | |

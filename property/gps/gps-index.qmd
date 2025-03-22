@@ -1,0 +1,75 @@
+---
+title: Precision GPS on the Cheap
+subtitle: Where am I, exactly?
+author: Dave Vieglais
+categories: [infrastructure, GIS]
+---
+
+Centimeter resolution GPS for under $500.
+
+## Base station
+
+The sensor is positioned 12.91' above the ground elevation of 144', so the sensor is 156.91' or +43.89m relative to MSL.
+
+Coordinates are: `+39.02699072 -76.56399835 +17.413m` relative to the WGS-84 ellipsoid, `1152839.1256, -4825659.9491, 3994656.1792 m` in ECEF. (+47.826m relative to MSL). In this region, MSL is approximately +13.71m relative to the ellipsoid.
+
+
+## Coordinate Conversion
+
+Google maps, default GPS, and generally most common maps use WGS84 (latitude and longitude), which is EPSG:4326.
+
+Earth-centered Earth-fixed coordinates are used for RTK reference and internally by things like Cesium. This is EPSG:4978.
+
+The local coordinate system used by surveyors and legal documents is Maryland NAD83, which is [EPSG:2893](https://epsg.io/2893).
+
+Converting to and from WGS84 (EPSG:4326) can be done using [`proj`](https://proj.org/) and most conveniently, the included [`cs2cs`](https://proj.org/apps/cs2cs.html) tool.
+
+From WG884 (EPSG:4326) to NAD83 (EPSG:2893):
+
+```
+echo "39.02699653 -76.56401381" | cs2cs -f "%.5f" epsg:4326 epsg:2893
+1436190.80285 495708.94613 0.00000
+```
+
+From NAD83 to WGS84:
+
+```
+echo "1436190.80285 495708.94613 0.00000" |  cs2cs -f "%.8f" epsg:2893 epsg:4326
+-76.56401381 39.02699653 0.00000000
+```
+
+From WGS84 to ECEF:
+```
+echo "39.02699653 -76.56401381 47.826" | cs2cs -f "%.5f" epsg:4326 epsg:4978
+1152843.21890	-4825682.84520 3994675.83102
+```
+
+From ECEF to WGS84:
+```
+echo "1152843.21890 -4825682.84520 3994675.83102" | cs2cs -f "%.8f" epsg:4978 epsg:4326
+39.02699653	-76.56401381 47.82599962
+```
+
+## Computing an offset
+
+Convert the longitude, latitude to NAD83, adjust the easting, northing by the required amount (NAD83 is ft east-west and north-south), then convert the value back to longitude, latitude.
+
+For example, the original base station estimate is about 1.2m off according to a couple reference points. The adjustmet is:
+
+```
+deltaX = 1434482.0367 - 1434478.0376
+       = 3.9991
+deltaY = 496145.9711 - 496147.688
+       = -1.7169
+```
+
+Adjusted base station coordinates:
+
+```
+NAD83: 1436194.80195 495707.22923
+WGS84: 39.02699176 -76.56399976 15.180
+ECEF: 1152838.58686339	-4825658.21992800 3994654.86289776
+```
+
+
+

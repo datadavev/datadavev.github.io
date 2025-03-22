@@ -1,0 +1,68 @@
+---
+title: Identifier Resolution
+subtitle: General pattern of globally unique identifier resolution services.
+tags: [identifier, PID, GUID, ARK, DOI]
+author: Dave Vieglais
+date: 2023-03-27
+categories: [data]
+---
+
+The practice of resolving an identifier to a resource location generally involves progressive refinement of location detail gathered through sequential inquiry to different sources of information. When resolution is performed over HTTP, the progressive refinement occurs through a series of HTTP redirects until the resource is located or the resolution is rejected as invalid.
+
+The different sources of information about identifiers can be broadly grouped into three levels: *Scheme Resolver*, *Prefix Resolver*, and *Resource Resolver*.
+
+1. The *Scheme Resolver* directs requests to services appropriate for a particular scheme (e.g. `ark:` or `doi:`).
+   For example, a *Scheme Resolver* would have knowledge that identifiers following the "doi" scheme may be resolved by the service located at "https://doi.org/". Similarly, ARK identifiers may be resolved at "https://n2t.net/".
+   A *Scheme Resolver* redirects an identifier resolve request to a known *Prefix Resolver*.
+2. The *Prefix Resolver* supports grouping of identifiers with particular services. The *Prefix Resolver* typically examines a portion of the identifier such as a prefix to determine which services can provide more detail about the identifier.
+   For example, ARK identifiers have a numeric prefix, the "NAAN" (Name Assigining Authority Number). Each NAAN is associated with a service responsible for managing identifiers created with that prefix.
+   A *Prefix Resolver* redirects an identifier resolve request to a known *Resource Resolver*.
+3. A *Resource Resolver* is able to associate an identifier with the location of a specific resource, which will generally be a Resource Server where the actual resource is stored and made available.
+   A *Resource Resolver* service takes an identifier as input, and returns the Resource Server location information to the client. 
+   
+The three levels of resolution described here is a broad generalization. Fewer or more levels may actually be involved in the resolution of any particular identifier. However, three levels has emerged as a somewhat typical pattern for scalable resolution of globally unique identifiers and provides a useful framework for discussion. 
+   
+An example of sequential location refinement for resolution of the ARK identifier `ark:/12148/bpt6k10733944` is provided in @fig-resolvers.
+
+```{.plantuml #fig-resolvers caption="Generalization of identifier resolution through three levels of resolver service. The *Scheme Resolver* understands \"ark:\" identifiers are resolved by the *Prefix Resolver* `n2t.net`, which in turn understands identifiers with the prefix \"12148\" are resolved by the *Resource Resolver* `ark.bnf.fr`. The *Resource Resolver* in turn directs the user to the actual resource."}
+
+Actor User as user
+Participant "Scheme\nResolver" as sr
+Participant "Prefix\nResolver" as pr
+Participant "Resource\nResolver" as rr
+Participant "Resource\nServer" as rs
+user -> sr: **ark:**/12148/bpt6k10733944
+activate user
+activate sr
+sr --> user: 302 "https://n2t.net/ark:/12148/bpt6k10733944"
+deactivate sr
+user -> pr: **ark:/12148**/bpt6k10733944
+activate pr
+pr --> user: 302 "https://ark.bnf.fr/ark:/12148/bpt6k10733944"
+deactivate pr
+user -> rr: ark.bnf.fr/**ark:/12148/bpt6k10733944**
+activate rr
+rr --> user: 302 "https://gallica.bnf.fr/ark:/12148/bpt6k10733944"
+deactivate rr
+user -> rs: gallica.bnf.fr/**ark:/12148/bpt6k10733944**
+activate rs
+rs --> user: 200 "Aventures d'Alice au pays des merveilles / par Lewis Carroll ; illustrées par Arthur Rackham"
+deactivate rs
+deactivate user
+```
+
+Note that there may be multiple instances of Scheme, Prefix, and Resource Resolvers. Where content between instances overlaps, it is critical that mechanisms are in place to ensure trustworthy consistency across instances. If knowledge of identifier detail was not consistent across resolver instances, resolution would produce inconsistent results, and so reduce the value of globally unique, resolvable identifiers. Service trustworthiness is important to avoid potential content spoofing or malicious action where an agent deliberately causes resolution to content different from content owner intent (E.g. an identifier pointing to a factual news article redirected to fake news by a malicious agent).
+
+When expressing an identifier as a URL, the identifier is being directly coupled to a service, and so consideration should be given to the availability of the service and efficiency of use within the applicable context. In general, services at the finer level of detail in the resolver chain may be more ephemeral. Server names and url patterns may change as services evolve, and so URLs associated directly with those services may be considered somehwat more fragile in the long term. Hence, there is some benefit to constructing URLs using services at higher levels in the resolution chain.
+
+There is no universal, globally accepted identifier scheme resolver service, though such capability is offered by `identifiers.org` and `n2t.net`. In the example workflow presented in Figure 1. above, any of the following URLs ultimately resolve to the same resource:
+
+
+1. https://n2t.net/ark:/12148/bpt6k10733944
+2. https://ark.bnf.fr/ark:/12148/bpt6k10733944
+3. https://gallica.bnf.fr/ark:/12148/bpt6k10733944
+
+
+URL 3 is most closely associated with the resource, is more efficient for the user (no redirects), though may be more ephemeral and impacted by changes to the collection infrastructure. URL 3 could be considered appropriate for use within the collection viewer application where any future changes to the URL may be managed by the application logic.
+
+At the other extreme, URL 1 might be considered good for long term reference to the resource. Retrieval of the resource is less efficient since there are more redirects, but is arguably more resilient to changes to underlying services since the resolver metadata may be updated as necessary by the resource managers, thus removing the need to change published URLs.
