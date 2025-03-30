@@ -46,7 +46,7 @@ async function loadData(query, params=[], waiting_id=null) {
 
 
 
-```
+```{ojs}
 // Query the Parquet file
 records = loadData(`SELECT COUNT(*) as count, otype FROM read_parquet('${parquet_path}') GROUP BY otype ORDER BY count DESC`, [], "loading_2")
 viewof results = Inputs.table(records);

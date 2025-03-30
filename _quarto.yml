@@ -4,12 +4,17 @@ project:
   render:
     - "*.qmd"
     - "!ignored"
-
+  preview:
+    port: 3999
 website:
   title: "datadavev.github.io"
   sidebar:
     style: "floating"
     search: true
+    pinned: false
+    collapse-level: 1  
+    left:
+      collapse-below: "xxl"
     contents:
       - section: "About"
         contents:
@@ -30,7 +35,7 @@ website:
         contents:
           - href: notes/duckdb/index.qmd
             text: "DuckdDB"
-          - href: notes/duckdb/vanilla.qmd
+          - href: notes/duckdb/ddbvanilla.qmd
             text: "Duckdb with Vanilla Javascript"
 
       - section: "Data"

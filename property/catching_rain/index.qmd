@@ -55,6 +55,7 @@ aaco_precip = px.scatter(
 aaco_precip.show()
 stats = px.get_trendline_results(aaco_precip)
 monthly_means = df.query("Year < 2021").groupby("Month").mean().reset_index()
+ojs_define(monthly_means=monthly_means.values.tolist())
 monthly_std = df.query("Year < 2021").groupby("Month").std().reset_index()
 monthly_precip = px.bar(
     monthly_means,
@@ -127,6 +128,38 @@ table.append('</tbody>')
 table.append('</table>')
 Markdown("\n".join(table))
 ```
+
+```{ojs}
+
+function makeInputs() {
+    const data = [];
+    for (let i=0; i<12; i++) {
+        data.push(Inputs.range([0,12], {step:0.1, value:monthly_means[i][2], label: `Month ${i}`}));
+    }
+    return data;
+}
+
+function getTotal(monthly, usage, storage) {
+    let total = 0;
+    for (let i=0; i <12; i++) {
+        total += monthly[i].value;
+    }
+    return storage + total - usage;
+}
+
+input_list = makeInputs();
+
+viewof months = Inputs.form(input_list);
+
+balance = {
+    yield getTotal(input_list, 900, 3000);
+}
+```
+
+${input_list[0].value}
+
+${balance}
+
 
 Notes:
 

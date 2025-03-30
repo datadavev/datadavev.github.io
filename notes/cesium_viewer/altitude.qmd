@@ -317,6 +317,9 @@ egm2008 = await geoid("egm2008-5");
         font-family: Cousine, fixed;
         font-size: 0.6rem;
     }
+    #cesiumContainer {
+        aspect-ratio: 1/1;
+    }
 </style>
 
 <div id="cesiumContainer"></div>
@@ -399,7 +402,7 @@ class CView {
             timeline: false,
             animation: false,
             baseLayerPicker: false,
-            geocoder: new OpenStreetMapNominatimGeocoder(),
+            //geocoder: new OpenStreetMapNominatimGeocoder(),
             fullscreenElement: target,
             terrain: Cesium.Terrain.fromWorldTerrain(),
         });

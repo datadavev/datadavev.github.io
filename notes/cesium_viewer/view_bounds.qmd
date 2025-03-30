@@ -197,6 +197,7 @@ handler.setInputAction((click) => {
         east:${Cesium.Math.toDegrees(bb.east).toFixed(2)}
         north:${Cesium.Math.toDegrees(bb.north).toFixed(2)}</pre>`;*/
     bbsouth.value = Cesium.Math.toDegrees(bb.south).toFixed(2);
+    //bbsouth.dispatchEvent(new Event("input", {bubbles: true}));
     bbnorth.value = Cesium.Math.toDegrees(bb.north).toFixed(2);
     bbwest.value = Cesium.Math.toDegrees(bb.west).toFixed(2);
     bbeast.value = Cesium.Math.toDegrees(bb.east).toFixed(2);
@@ -233,6 +234,8 @@ bbsouth = Inputs.text({label:"S", value:0.0});
 bbeast = Inputs.text({label:"E", value:0.0});
 bbnorth = Inputs.text({label:"N", value:0.0});
 ```
+
+Latitude range = ${bbnorth.value - bbsouth.value}
 
 |  |  |  |
 | -- | -- | -- |
