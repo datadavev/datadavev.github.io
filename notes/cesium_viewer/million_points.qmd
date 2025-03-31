@@ -1,0 +1,233 @@
+---
+title: "Show a million points on Cesium"
+---
+
+This page shows a cesium view with 1,000,000 randomly generated points displayed. Mousing over a point will show a tag with the point ID. The point size is adjusted by a `NearFarScalar` responsive to the camera distance from the points.
+
+Although terrain is shown, the points are not adjusted with terrain height. There is an option to compute the height of points using sampleTerrainMostDetailed, however that should only be used when the results can be preserved since it is fairly slow (generally a couple seconds per batch of 1000).
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet"></link>
+<style>
+    div.cesium-topleft {
+        display: block;
+        position: absolute;
+        background: #00000099;
+        color: white;
+        height: auto;
+        z-index: 999;        
+    }
+    #cesiumContainer {
+        aspect-ratio: 1/1;
+    }
+</style>
+
+<!--
+```{ojs}
+message = {
+
+}
+```
+-->
+<div id="cesiumContainer"></div>
+
+
+```{ojs}
+//| output: false
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzk3NjkyMy1iNGI1LTRkN2UtODRiMy04OTYwYWE0N2M3ZTkiLCJpZCI6Njk1MTcsImlhdCI6MTYzMzU0MTQ3N30.e70dpNzOCDRLDGxRguQCC-tRzGzA-23Xgno5lNgCeB4';
+```
+
+```{ojs}
+
+function randomCoordinateJitter(degree, margin) {
+    return degree + margin * (Math.random() - 0.5) / 0.5;
+}
+
+async function sleep(ms=500) {
+        return new PromiseRejectionEvent(resolve => setTimeout(resolve, ms));
+}
+
+function createShowPrimitive(viewer) {
+    return function(movement) {
+        // Get the point at the mouse end position
+        const selectPoint = viewer.viewer.scene.pick(movement.endPosition);        
+
+        // Clear the current selection, if there is one and it is different to the selectPoint
+        if (viewer.currentSelection !== null) {
+            //console.log(`selected.p ${viewer.currentSelection}`)
+            if (Cesium.defined(selectPoint) && selectPoint !== viewer.currentSelection) {
+                console.log(`selected.p 2 ${viewer.currentSelection}`)
+                viewer.currentSelection.primitive.pixelSize = 4;
+                viewer.currentSelection.primitive.outlineColor = Cesium.Color.TRANSPARENT;
+                viewer.currentSelection.outlineWidth = 0;
+                viewer.currentSelection = null;
+            }
+        }
+
+        // If selectPoint is valid and no currently selected point
+        if (Cesium.defined(selectPoint) && selectPoint.hasOwnProperty("primitive")) {
+            //console.log(`showPrimitiveId ${selectPoint.id}`);
+            const carto = Cesium.Cartographic.fromCartesian(selectPoint.primitive.position)
+            viewer.pointLabel.position = selectPoint.primitive.position;
+            viewer.pointLabel.label.show = true;
+            viewer.pointLabel.label.text = `id:${selectPoint.id}, ${carto}`;
+            selectPoint.primitive.pixelSize = 20;
+            selectPoint.primitive.outlineColor = Cesium.Color.YELLOW;
+            selectPoint.primitive.outlineWidth = 3;
+            viewer.currentSelection = selectPoint;
+        } else {
+            viewer.pointLabel.label.show = false;
+        }            
+    }
+}
+
+
+class CView {
+    constructor(target) {
+        this.viewer = new Cesium.Viewer(
+            target, {
+                timeline: false,
+                animation: false,
+                baseLayerPicker: false,
+                fullscreenElement: target,
+                terrain: Cesium.Terrain.fromWorldTerrain()
+            });
+        this.currentSelection = null;
+        this.point_size = 1;
+        this.n_points = 0;
+        // https://cesium.com/learn/cesiumjs/ref-doc/PointPrimitiveCollection.html
+        this.points = new Cesium.PointPrimitiveCollection();
+        this.viewer.scene.primitives.add(this.points);
+     
+        this.pointLabel = this.viewer.entities.add({
+            label: {
+            show: false,
+            showBackground: true,
+            font: "14px monospace",
+            horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(15, 0),
+            // this attribute will prevent this entity clipped by the terrain
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            text:"",
+            },
+        });
+
+        this.pickHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+        // Can also do this rather than wait for the points to be generated
+        //this.pickHandler.setInputAction(createShowPrimitive(this), Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    }
+
+    enableTracking() {
+        this.pickHandler.setInputAction(createShowPrimitive(this), Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    }
+
+    /**
+     * Wait for the terrain provider to be available. This is created asynchronously during the
+     * view initialization which often returns before the terrain provider is complete. Here we 
+     * wait around for up to 3 seconds (10x300ms) until the terrain provider is ready.
+     */
+    async waitForTerrainProvider() {
+        let n = 0;
+        while (n < 10 && !Cesium.defined(this.viewer.terrainProvider)) {
+            await sleep(300);
+            n += 1;
+        }
+    }
+
+    /**
+     * Add points at terrain elevation.
+     * 
+     * This uses sampleTerrainMostDetailed to compute the terrain elevations for batches
+     * of 100 points at a time. It typically takes a couple seconds for a batch of 1000 to complete
+     * so using 100 provides a more interesting visual as the points are added.
+     * 
+     * The actual time seems to be dependent on exogenous factors.
+     */
+    async generatePointsAtTerrain(n_points=1000, point_size=4) {
+        this.n_points = n_points;
+        this.point_size = point_size;
+        // change point size with camera distance
+        const scalar = new Cesium.NearFarScalar(1.5e2, 2, 8.0e6, 0.2);
+        let total = 0;
+        await this.waitForTerrainProvider();
+        let batch_size = 1000;
+        while (total < this.n_points) {
+            const batch = [];
+            if (n_points - total < batch_size) {
+                batch_size = n_points - total;
+            }
+            // create a batch of coordinates
+            for (let i=0; i<batch_size; i++) {
+                batch.push(Cesium.Cartographic.fromDegrees(
+                    randomCoordinateJitter(0.0, 180.0),  //longitude
+                    randomCoordinateJitter(0.0, 90.0),   //latitude
+                ));
+            }
+            // compute the terrain (ellipsoid) elevations for the coordinates
+            // since this is async, it has the convenient result of letting the display update 
+            // as more points are added.
+            const updatedPositions = await Cesium.sampleTerrainMostDetailed(this.viewer.terrainProvider, batch, true);
+
+            // create points from the updated coordinates that have the terrain elevation added.
+            for (let i=0; i<batch.length; i++) {
+                let color = Cesium.Color.PINK;
+                if ((i % 2) === 0) {
+                    color = Cesium.Color.CYAN;
+                }
+                let pt = updatedPositions[i];
+                this.points.add({
+                    id: total,
+                    position: Cesium.Cartesian3.fromRadians(pt.longitude, pt.latitude, pt.height),
+                    pixelSize: this.point_size,
+                    color: color,
+                    scaleByDistance: scalar,
+                });
+                total += 1;
+            }
+        }
+    }
+
+    async generatePoints(n_points=1000, point_size=4) {
+        this.n_points = n_points;
+        this.point_size = point_size;
+        // https://cesium.com/learn/ion-sdk/ref-doc/NearFarScalar.html
+        const scalar = new Cesium.NearFarScalar(1.5e2, 2, 8.0e6, 0.2);
+        for (var i = 0; i < this.n_points; i++) {
+            let color = Cesium.Color.PINK;
+            if ((i % 2) === 0) {
+                color = Cesium.Color.CYAN;
+            }
+            this.points.add({
+                id: i,
+                // https://cesium.com/learn/cesiumjs/ref-doc/Cartesian3.html#.fromDegrees
+                position: Cesium.Cartesian3.fromDegrees(
+                    randomCoordinateJitter(0.0, 180.0),  //longitude
+                    randomCoordinateJitter(0.0, 90.0),   //latitude
+                    0,//randomCoordinateJitter(10.0, 10.0), //elevation, m
+                ),
+                pixelSize: this.point_size,
+                color: color,
+                scaleByDistance: scalar,
+            });
+        }
+    }
+
+    async doCreatePoints() {
+        const t0 = new Date().getTime();
+        console.log(`start generating`);
+        // Generating points is fast, but computing their elevation is fairly slow at a couple seconds per batch of 1000.
+        //await this.generatePointsAtTerrain(10000);
+        await this.generatePoints(1000000);
+        const t1 = new Date().getTime();
+        console.log(`done generating. Took ${(t1-t0)/1000} seconds`);
+    }
+}
+
+
+content = new CView("cesiumContainer");
+setTimeout(function() {
+    content.doCreatePoints().then(content.enableTracking());
+}, 1000);
+
+```
