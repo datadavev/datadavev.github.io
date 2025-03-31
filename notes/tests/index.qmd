@@ -1,0 +1,39 @@
+---
+title: "Tests for Quarto stuff"
+---
+
+
+```{ojs}
+
+monthly_means = {
+    const data = [3.2,2.9,3.7,3.5,3.8,3.9,4.3,4.4,3.8,3.3,3,3.4,]
+    return data;
+}
+
+function makeInputs() {
+    const data = [];
+    for (let i=0; i<12; i++) {
+        data.push(Inputs.range([0,12], {step:0.1, value:monthly_means[i], label: `Month ${i}`}));
+    }
+    return data;
+}
+
+function getTotal(monthly, usage, storage) {
+    let total = 0;
+    for (let i=0; i <12; i++) {
+        total += monthly[i].value;
+    }
+    return storage + total - usage;
+}
+
+input_list = makeInputs();
+
+viewof months = Inputs.form(input_list);
+
+balance = {
+    yield getTotal(input_list, 900, 3000);
+}
+
+```
+
+${balance}
