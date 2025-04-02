@@ -1,0 +1,76 @@
+---
+title: Force Graphs
+---
+<!--<script src="//cdn.jsdelivr.net/npm/force-graph"></script>-->
+
+## Basic Force Graph
+
+Demonstrates the use of [force-graph](https://github.com/vasturiano/force-graph).
+
+<div id="2d-graph"></div>
+
+```{ojs}
+//| code-fold: true
+ForceGraph = require("//cdn.jsdelivr.net/npm/force-graph");
+
+graphdata = FileAttachment("miserables.json").json();
+
+Graph = new ForceGraph(document.getElementById('2d-graph'))
+        .graphData(graphdata)
+        .width(800)
+        .height(800)
+        .nodeId("id")
+        .nodeAutoColorBy('group')
+        .nodeCanvasObject((node, ctx, globalScale) => {
+          const label = node.id;
+          const fontSize = 12/globalScale;
+          ctx.font = `${fontSize}px Sans-Serif`;
+          const textWidth = ctx.measureText(label).width;
+          const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = node.color;
+          ctx.fillText(label, node.x, node.y);
+
+          node.__bckgDimensions = bckgDimensions; // to re-use in nodePointerAreaPaint
+        })
+        .nodePointerAreaPaint((node, color, ctx) => {
+          ctx.fillStyle = color;
+          const bckgDimensions = node.__bckgDimensions;
+          bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+        });
+```
+
+
+
+## 3D Force Graph
+
+Demonstrates the use of [3d-force-graph](https://github.com/vasturiano/3d-force-graph).
+
+<div id="3d-graph"></div>
+
+```{ojs}
+//| code-fold: true
+
+selected_node = Inputs.text({label:"Clicked Node", value:""})
+
+function setSelected(v) {
+  selected_node.value = v;
+}
+
+ForceGraph3D = require("//cdn.jsdelivr.net/npm/3d-force-graph");
+
+Graph3 = new ForceGraph3D(document.getElementById('3d-graph'))
+      .width(800)
+      .height(800)
+      .graphData(graphdata)
+      .nodeAutoColorBy('user')
+      .nodeLabel((node) => {return `${node.id}: ${node.group}`})
+      .onNodeClick((node) => {
+        setSelected(node.id);
+      });
+```
