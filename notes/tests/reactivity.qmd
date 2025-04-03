@@ -5,10 +5,14 @@ categories: [observable, test]
 
 
 ```{ojs}
-x = 10;
+mutable x = 10;
+
+function setX(v) {
+    mutable x += v;
+}
 ```
 
-1 - The value of `x` is `{ojs} ${x}`.
+1 - The value of `x` is `{ojs} {x}`.
 
 2 - The value of `x` is ${x}.
 
@@ -17,7 +21,6 @@ md`3 - The values of \`x\` is ${x}.`;
 ```
 
 ```{ojs}
-{
-    console.log(`${x}`)
-}
+viewof button = Inputs.button("X", {reduce:() => {setX(1)}})
 ```
+
