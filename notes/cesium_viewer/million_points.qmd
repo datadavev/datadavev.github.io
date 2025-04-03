@@ -99,6 +99,9 @@ class CView {
         this.points = new Cesium.PointPrimitiveCollection();
         this.viewer.scene.primitives.add(this.points);
      
+        //this.viewer.scene.globe.depthTestAgainstTerrain = false;
+        //this.viewer.scene.logarithmicDepthBuffer = false;
+
         this.pointLabel = this.viewer.entities.add({
             label: {
             show: false,
@@ -209,6 +212,7 @@ class CView {
                 pixelSize: this.point_size,
                 color: color,
                 scaleByDistance: scalar,
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
             });
         }
     }

@@ -226,8 +226,9 @@ handler.setInputAction((click) => {
         });
     }
 }, Cesium.ScreenSpaceEventType.LEFT_UP);
-
 ```
+
+
 ```{ojs}
 bbwest = Inputs.text({label:"W", value:0.0});
 bbsouth = Inputs.text({label:"S", value:0.0});

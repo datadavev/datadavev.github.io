@@ -8,7 +8,7 @@ $font-family-sans-serif: 'Crimson Text','Crimson Temp:Georgia';
 $font-family-monospace: 'Roboto Mono', monospace;
 $font-size-root:         20px;
 $headings-font-weight:  400 !default;
-$body-color:            #333333;
+//$body-color:            #dddddd;
 
 
 /*-- scss:rules --*/
@@ -24,6 +24,10 @@ pre, code {
 
 pre code {
     font-size: 0.7rem;
+}
+
+pre code:not(.sourceCode), td code:not(.sourceCode), li code:not(.sourceCode) {
+    background-color: #333333
 }
 
 a {
@@ -58,6 +62,6 @@ a {
     background-color:#DDA15E;
 }
 .sidebar-item-container {
-    font-family: “Source Sans Pro”, Helvetica, sans-serif;
+    font-family: "Source Sans Pro", Helvetica, sans-serif;
     font-size: smaller;
 }
