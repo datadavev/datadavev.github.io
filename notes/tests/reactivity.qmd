@@ -1,0 +1,23 @@
+---
+title: Reactivity with ojs 
+categories: [observable, test]
+---
+
+
+```{ojs}
+x = 10;
+```
+
+1 - The value of `x` is `{ojs} ${x}`.
+
+2 - The value of `x` is ${x}.
+
+```{ojs}
+md`3 - The values of \`x\` is ${x}.`;
+```
+
+```{ojs}
+{
+    console.log(`${x}`)
+}
+```
