@@ -25,5 +25,7 @@ filters:
   #- pandoc-plantuml
   #- /usr/local/bin/pandoc-include-code
 
+execute:
+  freeze: auto
 bibliography: datadavev.bib
 csl: chicago-author-date.csl

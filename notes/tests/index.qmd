@@ -1,8 +1,9 @@
 ---
 title: "Tests for Quarto stuff"
+categories: [observable, test]
 ---
 
-
+Here we have a form made up from some sliders that have be generated programmatically. We want to display the total of the sliders reacting to changes in slider values.
 ```{ojs}
 
 monthly_means = {
@@ -18,22 +19,23 @@ function makeInputs() {
     return data;
 }
 
-function getTotal(monthly, usage, storage) {
-    let total = 0;
-    for (let i=0; i <12; i++) {
-        total += monthly[i].value;
+function getTotal(monthly) {
+    let mtotal = 0;
+    for (const item of monthly){
+        mtotal = mtotal+item;
     }
-    return storage + total - usage;
+    return mtotal;
 }
 
 input_list = makeInputs();
 
 viewof months = Inputs.form(input_list);
 
-balance = {
-    yield getTotal(input_list, 900, 3000);
+total = {
+    yield getTotal(months, 5, 1, 10);
 }
 
 ```
 
-${balance}
+The total is: ${total}
+ 
